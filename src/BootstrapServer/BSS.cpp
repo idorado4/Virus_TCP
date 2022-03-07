@@ -3,11 +3,74 @@
 #include <SFML/Network.hpp>
 
 
+bool running;
+
+
+struct Peer
+{
+	std::string IP; 
+	uint16_t PORT; //Unsigned Short
+	
+	Peer(std::string _ip, uint16_t _port) {
+		IP = _ip;
+		PORT = _port;
+	}
+};
+
+void Manager();
 
 int main() {
 
+	running = true;
 
+	Manager();
+	
+	/*std::thread tManager(Manager);
+	tManager.detach();*/
+
+	/*char command;
+	do {
+		std::cout << "Type 'c' to close the Server" << std::endl;
+		std::cin >> command;
+	} while (command != 'c');*/
 
 
 	return 0;
+}
+
+void Manager() {
+
+	sf::TcpListener listener;
+	sf::Socket::Status status = listener.listen(50000);
+	if (status != sf::Socket::Status::Done) {
+		std::cout << "Error al escuchar por el puerto 50000" << std::endl;
+		return;
+	}
+
+	//Los clientes conectados
+	std::vector<Peer> clients;
+	
+	////El gestor de 
+	//sf::SocketSelector selector;
+	//selector.add(listener);
+
+	while (running) {
+
+		sf::TcpSocket sock;
+		status = listener.accept(sock);
+		
+		if (status != sf::Socket::Status::Done) {
+			std::cout << "Error al conectar el nuevo cliente" << std::endl;
+			continue;
+		}
+
+
+
+
+	}
+
+
+
+
+
 }
