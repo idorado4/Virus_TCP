@@ -1,0 +1,6 @@
+- Nombre
+- Max players
+- Current players -> IP : Port
+- Pass
+- ID (key del map)
+- Timestamp de último cambio (para eliminarla cuando sea necesario)
