@@ -44,6 +44,8 @@ void Manager() {
 	sf::Socket::Status status = listener.listen(50000);
 	if (status != sf::Socket::Status::Done) {
 		std::cout << "Error al escuchar por el puerto 50000" << std::endl;
+		char exit;
+		std::cin >> exit;
 		return;
 	}
 
@@ -64,14 +66,24 @@ void Manager() {
 			continue;
 		}
 
-		Peer newClient = { sock.getRemoteAddress().toString(), sock.getRemotePort() };
+		//enviar la info de los otros peers al nuevo
+		sf::Packet packet;
+		packet << clients.size();
+		std::cout << clients.size() << std::endl;
+		for (int i = 0; i < clients.size(); i++) {
+			packet << clients[i].IP;
+			packet << clients[i].PORT;
+		}
+		status = sock.send(packet);
 
+
+		Peer newClient = { sock.getRemoteAddress().toString(), sock.getRemotePort() };
+		
 		clients.push_back(newClient);
 		
 		std::cout << "Conectado el cliente: " << newClient.IP << " " << newClient.PORT << std::endl;
 
-
-
+		sock.disconnect();
 	}
 
 
