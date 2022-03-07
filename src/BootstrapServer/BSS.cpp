@@ -8,9 +8,9 @@ bool running;
 
 struct Peer
 {
-	std::string IP; 
+	std::string IP;
 	uint16_t PORT; //Unsigned Short
-	
+
 	Peer(std::string _ip, uint16_t _port) {
 		IP = _ip;
 		PORT = _port;
@@ -24,7 +24,7 @@ int main() {
 	running = true;
 
 	Manager();
-	
+
 	/*std::thread tManager(Manager);
 	tManager.detach();*/
 
@@ -49,21 +49,26 @@ void Manager() {
 
 	//Los clientes conectados
 	std::vector<Peer> clients;
-	
+
 	////El gestor de 
 	//sf::SocketSelector selector;
 	//selector.add(listener);
 
-	while (running) {
+	while (clients.size() < 4) {
 
 		sf::TcpSocket sock;
 		status = listener.accept(sock);
-		
+
 		if (status != sf::Socket::Status::Done) {
 			std::cout << "Error al conectar el nuevo cliente" << std::endl;
 			continue;
 		}
 
+		Peer newClient = { sock.getRemoteAddress().toString(), sock.getRemotePort() };
+
+		clients.push_back(newClient);
+		
+		std::cout << "Conectado el cliente: " << newClient.IP << " " << newClient.PORT << std::endl;
 
 
 

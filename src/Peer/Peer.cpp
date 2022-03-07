@@ -4,5 +4,13 @@
 
 int main() {
 
+	sf::TcpSocket sock;
+	sock.connect("localhost", 50000);
+
+	while (true)
+	{
+
+	}
+
 	return 0;
 }
