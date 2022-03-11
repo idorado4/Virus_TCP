@@ -1,7 +1,8 @@
 #include <iostream>
 #include <thread>
 #include <SFML/Network.hpp>
-
+#include <InputMemoryStream.h>
+#include <MyNetwork.h>
 
 bool running;
 
@@ -40,8 +41,14 @@ int main() {
 
 void Manager() {
 
-	sf::TcpListener listener;
-	sf::Socket::Status status = listener.listen(50000);
+	//sf::TcpListener listener;
+	//sf::Socket::Status status = listener.listen(50000);
+	
+	
+	MyNetwork::Listener listener;
+	sf::Socket::Status status = listener.Get()->listen(50000);
+	
+	
 	if (status != sf::Socket::Status::Done) {
 		std::cout << "Error al escuchar por el puerto 50000" << std::endl;
 		char exit;
