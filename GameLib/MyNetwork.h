@@ -31,6 +31,7 @@ public:
 		~Socket();
 		sf::TcpSocket* Get();
 		void Send(OutputMemoryStream oms);
+		sf::lpAddress GetRemoteAdress();
 		
 
 	};

@@ -65,9 +65,11 @@ void Manager() {
 
 	while (clients.size() < 4) {
 
-		sf::TcpSocket sock;
-		status = listener.accept(sock);
+		//sf::TcpSocket sock;
+		MyNetwork::Socket sock;
+		status = listener.Accept(sock);
 
+		//QUE HACEMOS CON LOS STATUS??
 		if (status != sf::Socket::Status::Done) {
 			std::cout << "Error al conectar el nuevo cliente" << std::endl;
 			continue;
@@ -81,7 +83,9 @@ void Manager() {
 			packet << clients[i].IP;
 			packet << clients[i].PORT;
 		}
-		status = sock.send(packet);
+
+		//aqui no ha de ser un packet ha de ser un OMS
+		status = sock.Send(packet);
 
 
 		Peer newClient = { sock.getRemoteAddress().toString(), sock.getRemotePort() };
