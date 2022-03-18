@@ -2,6 +2,7 @@
 #include <thread>
 #include <SFML/Network.hpp>
 #include <InputMemoryStream.h>
+#include <OutputMemoryStream.h>
 #include <MyNetwork.h>
 
 bool running;
@@ -76,25 +77,29 @@ void Manager() {
 		}
 
 		//enviar la info de los otros peers al nuevo
-		sf::Packet packet;
-		packet << clients.size();
+		OutputMemoryStream oms;
+		//
+		oms.Write(clients.size());
+		
 		std::cout << clients.size() << std::endl;
+
 		for (int i = 0; i < clients.size(); i++) {
-			packet << clients[i].IP;
-			packet << clients[i].PORT;
+
+			oms.WriteString(clients[i].IP);
+			oms.Write(clients[i].PORT);
 		}
 
 		//aqui no ha de ser un packet ha de ser un OMS
-		status = sock.Send(packet);
+		/*status = */sock.Send(oms);
 
 
-		Peer newClient = { sock.getRemoteAddress().toString(), sock.getRemotePort() };
+		Peer newClient = { sock.GetRemoteAdress(), sock.GetRemotePort() };
 		
 		clients.push_back(newClient);
 		
 		std::cout << "Conectado el cliente: " << newClient.IP << " " << newClient.PORT << std::endl;
 
-		sock.disconnect();
+		sock.Disconnect();
 	}
 
 
