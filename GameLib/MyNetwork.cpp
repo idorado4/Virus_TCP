@@ -14,9 +14,15 @@ MyNetwork::Listener::Listener()
 	myListener = new sf::TcpListener();
 }
 
-void MyNetwork::Listener::Listen(uint16_t PORT)
+MyNetwork::Listener::~Listener()
 {
-	myListener->listen(PORT);
+	delete myListener;
+	myListener = nullptr;
+}
+
+MyNetwork::Status MyNetwork::Listener::Listen(uint16_t PORT)
+{
+	return (MyNetwork::Status)myListener->listen(PORT);
 }
 
 sf::TcpListener* MyNetwork::Listener::Get()
@@ -24,10 +30,9 @@ sf::TcpListener* MyNetwork::Listener::Get()
 	return myListener;
 }
 
-sf::Socket::Status MyNetwork::Listener::Accept(Socket _socket)
+MyNetwork::Status MyNetwork::Listener::Accept(Socket* _socket)
 {
-	sf::Socket::Status status = myListener->accept(*_socket.Get());
-	return  status;
+	return (MyNetwork::Status) myListener->accept(*(_socket->Get()));
 }
 
 #pragma endregion
@@ -38,17 +43,22 @@ MyNetwork::Socket::Socket()
 {
 	mySocket = new sf::TcpSocket();
 }
-sf::Socket::Status MyNetwork::Socket::Connect(std::string IP, uint16_t PORT)
+MyNetwork::Socket::~Socket()
 {
-	return mySocket->connect(IP, PORT);
+	delete mySocket;
+	mySocket = nullptr;
+}
+MyNetwork::Status MyNetwork::Socket::Connect(std::string IP, uint16_t PORT)
+{
+	return (MyNetwork::Status)mySocket->connect(IP, PORT);
 }
 sf::TcpSocket* MyNetwork::Socket::Get()
 {
 	return mySocket;
 }
-void MyNetwork::Socket::Send(OutputMemoryStream oms)
+MyNetwork::Status MyNetwork::Socket::Send(OutputMemoryStream* oms)
 {
-	mySocket->send(oms.GetBufferPtr(), oms.GetLength());
+	return (MyNetwork::Status)mySocket->send(oms->GetBufferPtr(), oms->GetLength());
 }
 
 int MyNetwork::Socket::ReceiveInt()
@@ -56,7 +66,7 @@ int MyNetwork::Socket::ReceiveInt()
 	size_t br = 0;
 	char buffer[1000];
 	InputMemoryStream ims(buffer, br);
-	return 0;
+	return (int)buffer;
 }
 
 std::string MyNetwork::Socket::ReceiveString()
@@ -98,14 +108,23 @@ MyNetwork::Selector::Selector()
 {
 	mySelector = new sf::SocketSelector();
 }
+MyNetwork::Selector::~Selector()
+{
+	delete mySelector;
+	mySelector = nullptr;
+}
 sf::SocketSelector* MyNetwork::Selector::Get()
 {
 	return mySelector;
 }
 
-void MyNetwork::Selector::Add(sf::TcpListener* listener)
+void MyNetwork::Selector::Add(MyNetwork::Listener* listener)
 {
-	mySelector->add(*listener);
+	mySelector->add(*listener->Get());
+}
+void MyNetwork::Selector::Add(MyNetwork::Socket* socket)
+{
+	mySelector->add(*socket->Get());
 }
 
 

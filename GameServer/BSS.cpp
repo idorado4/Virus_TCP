@@ -42,15 +42,12 @@ int main() {
 
 void Manager() {
 
-	//sf::TcpListener listener;
-	//sf::Socket::Status status = listener.listen(50000);
-	
-	
 	MyNetwork::Listener listener;
-	sf::Socket::Status status = listener.Get()->listen(50000);
-	
-	
-	if (status != sf::Socket::Status::Done) {
+
+	MyNetwork::Status status = listener.Listen(50000);
+
+
+	if (status != MyNetwork::Status::DONE) {
 		std::cout << "Error al escuchar por el puerto 50000" << std::endl;
 		char exit;
 		std::cin >> exit;
@@ -59,47 +56,46 @@ void Manager() {
 
 	//Los clientes conectados
 	std::vector<Peer> clients;
-
-	////El gestor de 
-	//sf::SocketSelector selector;
-	//selector.add(listener);
-
+	
 	while (clients.size() < 4) {
 
-		//sf::TcpSocket sock;
-		MyNetwork::Socket sock;
-		status = listener.Accept(sock);
+		MyNetwork::Socket* sock = new MyNetwork::Socket();
+		status = (MyNetwork::Status)listener.Accept(sock);
 
-		//QUE HACEMOS CON LOS STATUS??
-		if (status != sf::Socket::Status::Done) {
+		if (status != MyNetwork::Status::DONE) {
 			std::cout << "Error al conectar el nuevo cliente" << std::endl;
 			continue;
 		}
 
 		//enviar la info de los otros peers al nuevo
 		OutputMemoryStream oms;
-		//
-		oms.Write(clients.size());
 		
+		oms.Write(clients.size());
+
 		std::cout << clients.size() << std::endl;
 
+		//le envio la info de los clientes en partida al nuevo
 		for (int i = 0; i < clients.size(); i++) {
-
 			oms.WriteString(clients[i].IP);
 			oms.Write(clients[i].PORT);
 		}
+		status = (MyNetwork::Status)sock->Send(&oms);
+	;
+		if (status != MyNetwork::Status::DONE) {
+			std::cout << "Error al enviar el mensaje" << std::endl;
+			continue;
+		}
 
-		//aqui no ha de ser un packet ha de ser un OMS
-		/*status = */sock.Send(oms);
 
+		Peer newClient = { sock->GetRemoteAdress(), sock->GetRemotePort() };
 
-		Peer newClient = { sock.GetRemoteAdress(), sock.GetRemotePort() };
-		
 		clients.push_back(newClient);
-		
+
 		std::cout << "Conectado el cliente: " << newClient.IP << " " << newClient.PORT << std::endl;
 
-		sock.Disconnect();
+		sock->Disconnect();
+
+		std::cout << clients.size() << std::endl;
 	}
 
 

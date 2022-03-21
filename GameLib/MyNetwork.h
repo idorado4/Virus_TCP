@@ -9,31 +9,33 @@ class MyNetwork
 	class Listener;
 	class Socket;
 	class Selector;
-public:
-	
+	enum Status;
 
+public:
 
 	class Listener {
-
+	private:
 		sf::TcpListener* myListener;
 	public:
 		Listener();
-		void Listen(uint16_t PORT);
+		~Listener();
+		MyNetwork::Status Listen(uint16_t PORT);
 		sf::TcpListener* Get();
-		sf::Socket::Status Accept(Socket _socket);
+		MyNetwork::Status Accept(Socket* _socket);
 
 
 	};
 
 	class Socket {
+	private:
 		sf::TcpSocket* mySocket;
 	public:
 		Socket();
-		//~Socket();
+		~Socket();
 
-		sf::Socket::Status Connect(std::string IP, uint16_t PORT);
+		MyNetwork::Status Connect(std::string IP, uint16_t PORT);
 		sf::TcpSocket* Get();
-		void Send(OutputMemoryStream oms);
+		MyNetwork::Status Send(OutputMemoryStream* oms);
 		int ReceiveInt();
 		std::string ReceiveString();
 		std::string GetRemoteAdress();
@@ -41,17 +43,28 @@ public:
 		uint16_t MyNetwork::Socket::GetLocalPort();
 
 		void Disconnect();
-		
+
 
 	};
 
 	class Selector {
+	private:
 		sf::SocketSelector* mySelector;
 	public:
 		Selector();
+		~Selector();
 		sf::SocketSelector* Get();
-		void Add(sf::TcpListener* listener);
-	}; 
+		void Add(MyNetwork::Listener* listener);
+		void Add(MyNetwork::Socket* socket);
+	};
+
+	enum Status {
+		DONE = sf::Socket::Status::Done,
+		NOTREADY = sf::Socket::Status::NotReady,
+		PARTIAL = sf::Socket::Status::Partial,
+		DISCONNECTED = sf::Socket::Status::Disconnected,
+		ERROR = sf::Socket::Status::Error
+	};
 
 	MyNetwork();
 
