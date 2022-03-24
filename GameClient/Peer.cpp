@@ -5,6 +5,12 @@
 #include <InputMemoryStream.h>
 #include <OutputMemoryStream.h>
 
+struct Player {
+	std::string IP;
+	uint16_t PORT;
+};
+
+
 void Connections(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _clientes);
 void SendMessage(std::vector<MyNetwork::Socket*>* _clientes);
 
@@ -24,121 +30,140 @@ int main() {
 	return 0;
 }
 
-//me conecto al server
+//me he conectado ya al server
 //me da la info de los demas
+//me desconecto del server
 //me conecto con los demas
 void Connections(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _clientes) {
 
 
-
-	int numPlayers = _sock->ReceiveInt();
-
-
-	uint16_t localPort = _sock->GetLocalPort();
-	//Desconectas del servidor
-	_sock->Disconnect();
-
-	MyNetwork::Listener listener;
-	MyNetwork::Status status = listener.Listen(localPort);
-	if (status != sf::Socket::Status::Done) {
-		std::cout << "Error al escuchar por el puerto " << localPort << std::endl;
-		char exit;
-		std::cin >> exit;
-		return;
-	}
-
-
-	// Create a selector
-	MyNetwork::Selector selector;
-
-	// Add the listener to the selector
-	selector.Add(&listener);
-
 	//Hacemos conexion con los peers recibidos del server
-	size_t currentClients = _sock->ReceiveInt();
+	int currentClients = 0;
+	InputMemoryStream* ims = nullptr;
+	//_sock->Receive(&ims);
+
+	InputMemoryStream* ims2 = _sock->Receive();
+
+	//ims->Read(&currentClients);
 	std::cout << currentClients << std::endl;
 
+
+	std::string IP = "";
+	IP = ims2->ReadString();
+	//
+	uint16_t port = 0;
+	//ims->Read(&port);
+
+	std::cout << "Recibido: " << IP << " " << port << std::endl;
+
+	/*std::vector<Player> players;
 
 	for (int i = 0; i < currentClients; i++)
 	{
 		MyNetwork::Socket* client = new MyNetwork::Socket();
 		std::string IP = "";
 		uint16_t port = 0;
-		IP = client->ReceiveString();
-		port = client->ReceiveInt();
 
-		status = client->Connect(IP, port);
+		IP = ims->ReadString();
+		ims->Read(&port);
 
-		if (status != MyNetwork::Status::DONE) {
-			std::cout << "Error al conectar el cliente: " << IP << " " << port << std::endl;
-			char exit;
-			std::cin >> exit;
-			return;
-		}
+		std::cout << "Recibido: " << IP << " " << port << std::endl;
+		Player newPlayer = { IP, port };
+		players.push_back(newPlayer);
+	}*/
+	//Desconectas del servidor
+//	_sock->Disconnect();
 
-		selector.Add(client);
-		_clientes->push_back(std::move(client));
-	}
-
-	// Endless loop that waits for new connections
 	while (true)
 	{
-		// Make the selector wait for data on any socket
-		if (selector.Wait())
-		{
-			if (selector.IsReady(&listener)) {
-				// The listener is ready: there is a pending connection
-				MyNetwork::Socket* client = new MyNetwork::Socket;
-				if (listener.Accept(client) == sf::Socket::Done)
-				{
-					// Add the new client to the clients list
-					std::cout << "Llega el cliente con puerto: " << client->GetRemotePort() << std::endl;
-					_clientes->push_back(std::move(client));
-					// Add the new client to the selector so that we will
-					// be notified when he sends something
-					selector.Add(client);
-				}
-				else
-				{
-					// Error, we won't get a new connection, delete the socket
-					std::cout << "Error al recoger conexión nueva\n";
-					delete client;
-				}
-			}
-			else {
-				for (size_t i = 0; i < _clientes->size(); i++)
-				{
-					MyNetwork::Socket* client = _clientes->at(i);
-					if (selector.IsReady(client))
-					{
-						// The client has sent some data, we can receive it
 
-						std::string strRec;
-						status = client->ReceiveString(&strRec);
-						if (status == sf::Socket::Done) 
-						{
-							std::string strRec;
-							packet >> strRec;
-							std::cout << "He recibido " << strRec << " del puerto " << client->getRemotePort() << std::endl;
-						}
-						else if (status == sf::Socket::Disconnected)
-						{
-							client->disconnect();
-							selector.remove(*client);
-							_clientes->erase(_clientes->begin() + i);
-							delete client;
-							std::cout << "Elimino el socket que se ha desconectado\n";
-						}
-						else
-						{
-							std::cout << "Error al recibir de " << client->getRemotePort() << std::endl;
-						}
-					}
-				}
-
-			}
-		}
 	}
+
+
+	//uint16_t localPort = _sock->GetLocalPort();
+	//MyNetwork::Listener listener;
+	//status = listener.Listen(localPort);
+	//if (status != sf::Socket::Status::Done) {
+	//	std::cout << "Error al escuchar por el puerto " << localPort << std::endl;
+	//	char exit;
+	//	std::cin >> exit;
+	//	return;
+	//}
+	//// Create a selector
+	//MyNetwork::Selector selector;
+
+	//// Add the listener to the selector
+	//selector.Add(&listener);
+	////Conectas con el nuevo cliente
+	//status = client->Connect(IP, port);
+
+	//if (status != MyNetwork::Status::DONE) {
+	//	std::cout << "Error al conectar el cliente: " << IP << " " << port << std::endl;
+	//	char exit;
+	//	std::cin >> exit;
+	//	return;
+	//}
+
+	//selector.Add(client);
+	//_clientes->push_back(std::move(client));
+
+
+	//// Endless loop that waits for new connections
+	//while (true)
+	//{
+	//	// Make the selector wait for data on any socket
+	//	if (selector.Wait())
+	//	{
+	//		if (selector.IsReady(&listener)) {
+	//			// The listener is ready: there is a pending connection
+	//			MyNetwork::Socket* client = new MyNetwork::Socket;
+	//			if (listener.Accept(client) == sf::Socket::Done)
+	//			{
+	//				// Add the new client to the clients list
+	//				std::cout << "Llega el cliente con puerto: " << client->GetRemotePort() << std::endl;
+	//				_clientes->push_back(std::move(client));
+	//				// Add the new client to the selector so that we will
+	//				// be notified when he sends something
+	//				selector.Add(client);
+	//			}
+	//			else
+	//			{
+	//				// Error, we won't get a new connection, delete the socket
+	//				std::cout << "Error al recoger conexión nueva\n";
+	//				delete client;
+	//			}
+	//		}
+	//		else { //ha llegado un mensaje
+	//			for (size_t i = 0; i < _clientes->size(); i++)
+	//			{
+	//				MyNetwork::Socket* client = _clientes->at(i);
+	//				if (selector.IsReady(client))
+	//				{
+	//					// The client has sent some data, we can receive it
+	//					std::string strRec;
+	//					status = client->ReceiveString(&strRec);
+	//					if (status == sf::Socket::Done)
+	//					{
+	//						std::cout << "He recibido " << strRec << " del puerto " << client->GetRemotePort() << std::endl;
+	//					}
+	//					else if (status == sf::Socket::Disconnected)
+	//					{
+	//						client->Disconnect();
+	//						selector.Remove(client);
+	//						_clientes->erase(_clientes->begin() + i);
+	//						delete client;
+	//						std::cout << "Elimino el socket que se ha desconectado\n";
+	//					}
+	//					else
+	//					{
+	//						std::cout << "Error al recibir de " << client->GetRemotePort() << std::endl;
+	//					}
+	//				}
+	//			}
+
+	//		}
+	//	}
+	//}
 
 }
 void SendMessage(std::vector<MyNetwork::Socket*>* _clientes)

@@ -32,7 +32,7 @@ sf::TcpListener* MyNetwork::Listener::Get()
 
 MyNetwork::Status MyNetwork::Listener::Accept(Socket* _socket)
 {
-	return (MyNetwork::Status) myListener->accept(*(_socket->Get()));
+	return (MyNetwork::Status)myListener->accept(*(_socket->Get()));
 }
 
 #pragma endregion
@@ -61,28 +61,22 @@ MyNetwork::Status MyNetwork::Socket::Send(OutputMemoryStream* oms)
 	return (MyNetwork::Status)mySocket->send(oms->GetBufferPtr(), oms->GetLength());
 }
 
-int MyNetwork::Socket::ReceiveInt()
+MyNetwork::Status MyNetwork::Socket::Receive(InputMemoryStream** _ims)
+{
+	MyNetwork::Status status;
+	size_t br = 0;
+	char buffer[1000];
+	status = (MyNetwork::Status)mySocket->receive(buffer, 1000, br);
+	*_ims = new InputMemoryStream(buffer, br);
+	return status;
+}
+
+InputMemoryStream* MyNetwork::Socket::Receive()
 {
 	size_t br = 0;
 	char buffer[1000];
-	InputMemoryStream ims(buffer, br);
-	return (int)buffer;
-}
-
-MyNetwork::Status MyNetwork::Socket::ReceiveString(std::string *strRecived)
-{
-	size_t br;
-	char buffer[1000];
-
-	MyNetwork::Status status = (MyNetwork::Status)mySocket->receive(buffer, 1000, br);
-
-	
-
-	InputMemoryStream ims(buffer, br);
-
-	*strRecived = ims.ReadString();
-
-	return status;
+	mySocket->receive(buffer, 1000, br);
+	return new InputMemoryStream(buffer, br);
 }
 
 std::string MyNetwork::Socket::GetRemoteAdress()
@@ -144,6 +138,11 @@ bool MyNetwork::Selector::IsReady(MyNetwork::Listener* listener)
 bool MyNetwork::Selector::IsReady(MyNetwork::Socket* socket)
 {
 	return mySelector->isReady(*socket->Get());
+}
+
+void MyNetwork::Selector::Remove(MyNetwork::Socket* socket)
+{
+	mySelector->remove(*socket->Get());
 }
 
 

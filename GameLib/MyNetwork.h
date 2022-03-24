@@ -36,8 +36,8 @@ public:
 		MyNetwork::Status Connect(std::string IP, uint16_t PORT);
 		sf::TcpSocket* Get();
 		MyNetwork::Status Send(OutputMemoryStream* oms);
-		int ReceiveInt();
-		MyNetwork::Status MyNetwork::Socket::ReceiveString(std::string *strRecived);
+		MyNetwork::Status Receive(InputMemoryStream** _ims);
+		InputMemoryStream* Receive();
 		std::string GetRemoteAdress();
 		uint16_t MyNetwork::Socket::GetRemotePort();
 		uint16_t MyNetwork::Socket::GetLocalPort();
@@ -59,6 +59,7 @@ public:
 		bool Wait();
 		bool IsReady(MyNetwork::Listener* listener);
 		bool IsReady(MyNetwork::Socket* socket);
+		void Remove(MyNetwork::Socket* socket);
 
 	};
 

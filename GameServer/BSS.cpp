@@ -56,7 +56,7 @@ void Manager() {
 
 	//Los clientes conectados
 	std::vector<Peer> clients;
-	
+
 	while (clients.size() < 4) {
 
 		MyNetwork::Socket* sock = new MyNetwork::Socket();
@@ -69,31 +69,35 @@ void Manager() {
 
 		//enviar la info de los otros peers al nuevo
 		OutputMemoryStream oms;
-		
-		oms.Write(clients.size());
-
-		std::cout << clients.size() << std::endl;
-
+		int clientsSize = clients.size();
+		//oms.Write(clientsSize);
+		//std::cout << "Clientes que envio " << clients.size() << std::endl;
+		std::string cojones = "cojones";
+		oms.WriteString("Hola");
+		//uint16_t joder = sock->GetRemotePort();
+		//oms.Write(joder);
 		//le envio la info de los clientes en partida al nuevo
-		for (int i = 0; i < clients.size(); i++) {
+		/*for (int i = 0; i < clients.size(); i++) {
 			oms.WriteString(clients[i].IP);
 			oms.Write(clients[i].PORT);
-		}
+		}*/
+
 		status = (MyNetwork::Status)sock->Send(&oms);
-	;
+
 		if (status != MyNetwork::Status::DONE) {
 			std::cout << "Error al enviar el mensaje" << std::endl;
 			continue;
 		}
 
-
 		Peer newClient = { sock->GetRemoteAdress(), sock->GetRemotePort() };
 
 		clients.push_back(newClient);
 
-		std::cout << "Conectado el cliente: " << newClient.IP << " " << newClient.PORT << std::endl;
+		for (int i = 0; i < clients.size(); i++) {
+			std::cout << "Current clients list: " << clients[i].IP << " " << clients[i].PORT << std::endl;
+		}
 
-		sock->Disconnect();
+		//sock->Disconnect();
 
 		std::cout << clients.size() << std::endl;
 	}
