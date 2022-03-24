@@ -37,7 +37,7 @@ public:
 		sf::TcpSocket* Get();
 		MyNetwork::Status Send(OutputMemoryStream* oms);
 		int ReceiveInt();
-		std::string ReceiveString();
+		MyNetwork::Status MyNetwork::Socket::ReceiveString(std::string *strRecived);
 		std::string GetRemoteAdress();
 		uint16_t MyNetwork::Socket::GetRemotePort();
 		uint16_t MyNetwork::Socket::GetLocalPort();
@@ -56,6 +56,10 @@ public:
 		sf::SocketSelector* Get();
 		void Add(MyNetwork::Listener* listener);
 		void Add(MyNetwork::Socket* socket);
+		bool Wait();
+		bool IsReady(MyNetwork::Listener* listener);
+		bool IsReady(MyNetwork::Socket* socket);
+
 	};
 
 	enum Status {

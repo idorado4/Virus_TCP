@@ -84,19 +84,19 @@ void Connections(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _cli
 	while (true)
 	{
 		// Make the selector wait for data on any socket
-		if (selector.wait())
+		if (selector.Wait())
 		{
-			if (selector.isReady(listener)) {
+			if (selector.IsReady(&listener)) {
 				// The listener is ready: there is a pending connection
-				sf::TcpSocket* client = new sf::TcpSocket;
-				if (listener.accept(*client) == sf::Socket::Done)
+				MyNetwork::Socket* client = new MyNetwork::Socket;
+				if (listener.Accept(client) == sf::Socket::Done)
 				{
 					// Add the new client to the clients list
-					std::cout << "Llega el cliente con puerto: " << client->getRemotePort() << std::endl;
+					std::cout << "Llega el cliente con puerto: " << client->GetRemotePort() << std::endl;
 					_clientes->push_back(std::move(client));
 					// Add the new client to the selector so that we will
 					// be notified when he sends something
-					selector.add(*client);
+					selector.Add(client);
 				}
 				else
 				{
@@ -108,13 +108,14 @@ void Connections(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _cli
 			else {
 				for (size_t i = 0; i < _clientes->size(); i++)
 				{
-					sf::TcpSocket* client = _clientes->at(i);
-					if (selector.isReady(*client))
+					MyNetwork::Socket* client = _clientes->at(i);
+					if (selector.IsReady(client))
 					{
 						// The client has sent some data, we can receive it
-						sf::Packet packet;
-						status = client->receive(packet);
-						if (status == sf::Socket::Done)
+
+						std::string strRec;
+						status = client->ReceiveString(&strRec);
+						if (status == sf::Socket::Done) 
 						{
 							std::string strRec;
 							packet >> strRec;

@@ -69,16 +69,20 @@ int MyNetwork::Socket::ReceiveInt()
 	return (int)buffer;
 }
 
-std::string MyNetwork::Socket::ReceiveString()
+MyNetwork::Status MyNetwork::Socket::ReceiveString(std::string *strRecived)
 {
 	size_t br;
 	char buffer[1000];
 
-	mySocket->receive(buffer, 1000, br);
+	MyNetwork::Status status = (MyNetwork::Status)mySocket->receive(buffer, 1000, br);
+
+	
 
 	InputMemoryStream ims(buffer, br);
 
-	return ims.ReadString();
+	*strRecived = ims.ReadString();
+
+	return status;
 }
 
 std::string MyNetwork::Socket::GetRemoteAdress()
@@ -125,6 +129,21 @@ void MyNetwork::Selector::Add(MyNetwork::Listener* listener)
 void MyNetwork::Selector::Add(MyNetwork::Socket* socket)
 {
 	mySelector->add(*socket->Get());
+}
+
+bool MyNetwork::Selector::Wait()
+{
+	return mySelector->wait();
+}
+
+bool MyNetwork::Selector::IsReady(MyNetwork::Listener* listener)
+{
+	return mySelector->isReady(*listener->Get());
+}
+
+bool MyNetwork::Selector::IsReady(MyNetwork::Socket* socket)
+{
+	return mySelector->isReady(*socket->Get());
 }
 
 
