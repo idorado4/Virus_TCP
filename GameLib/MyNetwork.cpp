@@ -61,20 +61,9 @@ MyNetwork::Status MyNetwork::Socket::Send(OutputMemoryStream* oms)
 	return (MyNetwork::Status)mySocket->send(oms->GetBufferPtr(), oms->GetLength());
 }
 
-MyNetwork::Status MyNetwork::Socket::Receive(InputMemoryStream** _ims)
-{
-	MyNetwork::Status status;
-	size_t br = 0;
-	char buffer[1000];
-	status = (MyNetwork::Status)mySocket->receive(buffer, 1000, br);
-	*_ims = new InputMemoryStream(buffer, br);
-	return status;
-}
 
-InputMemoryStream* MyNetwork::Socket::Receive()
+InputMemoryStream* MyNetwork::Socket::Receive(char buffer[], int bufferSize, size_t br)
 {
-	size_t br = 0;
-	char buffer[1000];
 	mySocket->receive(buffer, 1000, br);
 	return new InputMemoryStream(buffer, br);
 }

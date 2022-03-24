@@ -39,7 +39,14 @@ void Connections(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _cli
 
 	//Hacemos conexion con los peers recibidos del server
 	InputMemoryStream* ims = nullptr;
-	_sock->Receive(&ims);
+	//_sock->Receive(&ims);
+	size_t br = 0;
+	char buffer[1000];
+	ims = _sock->Receive(buffer, 1000, br);
+	
+
+
+	std::string IP = ims->ReadString();
 
 	int clientes = 0;
 	ims->Read(&clientes);
@@ -49,19 +56,14 @@ void Connections(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _cli
 	uint16_t port;
 	ims->Read(&port);
 
-	std::string IP = ims->ReadString();
 
-	InputMemoryStream* ims2 = nullptr;
 
-	//_sock->Receive(&ims);
-	_sock->Receive(&ims2);
+	std::string mss = ims->ReadString();
 
-	//std::string mss = ims->ReadString();
-	std::string mss = ims2->ReadString();
 	
 	int uno = 0;
-	//ims->Read(&uno);
-	ims2->Read(&uno);
+	ims->Read(&uno);
+
 
 
 
