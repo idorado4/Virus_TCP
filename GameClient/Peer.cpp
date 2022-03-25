@@ -39,13 +39,13 @@ void Connections(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _cli
 	MyNetwork::Status status;
 
 	//Creamos un contenedor rececptor de datos
-	InputMemoryStream* ims = nullptr;	
+	InputMemoryStream* ims = nullptr;
 
 	//Recibimos 
 	size_t br = 0;
 	char buffer[1000];
 	status = _sock->Receive(&ims, buffer, 1000, br);
-	
+
 	if (status != MyNetwork::Status::DONE) {
 		std::cout << "Error al recibir el mensaje" << std::endl;
 	}
@@ -58,10 +58,9 @@ void Connections(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _cli
 	//Hacemos conexion con los peers recibidos del server
 	for (int i = 0; i < currentClients; i++)
 	{
-		//MyNetwork::Socket* client = new MyNetwork::Socket();
 		std::string IP = "";
 		IP = ims->ReadString();
-		
+
 		uint16_t port = 0;
 		ims->Read(&port);
 
@@ -69,41 +68,49 @@ void Connections(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _cli
 		Player newPlayer = { IP, port };
 		players.push_back(newPlayer);
 	}
+
+	uint16_t localPort = _sock->GetLocalPort();
+
 	//Desconectas del servidor
 	_sock->Disconnect();
+
+
+	MyNetwork::Listener listener;
+	status = listener.Listen(localPort);
+	if (status != sf::Socket::Status::Done) {
+		std::cout << "Error al escuchar por el puerto " << localPort << std::endl;
+		char exit;
+		std::cin >> exit;
+		return;
+	}
+
+	// Create a selector
+	MyNetwork::Selector selector;
+
+	// Add the listener to the selector
+	selector.Add(&listener);
+
+	//Conectas con el nuevo cliente
+	for (int i = 0; i < players.size(); i++)
+	{
+		MyNetwork::Socket* client = new MyNetwork::Socket();
+		status = client->Connect(players[i].IP, players[i].PORT);
+		if (status != MyNetwork::Status::DONE) {
+			std::cout << "Error al conectar el cliente: " << players[i].IP << " " << players[i].PORT << std::endl;
+			char exit;
+			std::cin >> exit;
+			return;
+		}
+		selector.Add(client);
+		_clientes->push_back(std::move(client));
+	}
+
 
 	while (true)
 	{
 
 	}
 
-
-	//uint16_t localPort = _sock->GetLocalPort();
-	//MyNetwork::Listener listener;
-	//status = listener.Listen(localPort);
-	//if (status != sf::Socket::Status::Done) {
-	//	std::cout << "Error al escuchar por el puerto " << localPort << std::endl;
-	//	char exit;
-	//	std::cin >> exit;
-	//	return;
-	//}
-	//// Create a selector
-	//MyNetwork::Selector selector;
-
-	//// Add the listener to the selector
-	//selector.Add(&listener);
-	////Conectas con el nuevo cliente
-	//status = client->Connect(IP, port);
-
-	//if (status != MyNetwork::Status::DONE) {
-	//	std::cout << "Error al conectar el cliente: " << IP << " " << port << std::endl;
-	//	char exit;
-	//	std::cin >> exit;
-	//	return;
-	//}
-
-	//selector.Add(client);
-	//_clientes->push_back(std::move(client));
 
 
 	//// Endless loop that waits for new connections
