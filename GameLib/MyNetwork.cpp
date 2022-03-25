@@ -68,6 +68,14 @@ InputMemoryStream* MyNetwork::Socket::Receive(char buffer[], int bufferSize, siz
 	return new InputMemoryStream(buffer, br);
 }
 
+MyNetwork::Status MyNetwork::Socket::Receive(InputMemoryStream** ims, char buffer[], int bufferSize, size_t br)
+{
+	MyNetwork::Status status;
+	status = (MyNetwork::Status)mySocket->receive(buffer, 1000, br);
+	*ims = new InputMemoryStream(buffer, br);
+	return status;
+}
+
 std::string MyNetwork::Socket::GetRemoteAdress()
 {
 	return mySocket->getRemoteAddress().toString();

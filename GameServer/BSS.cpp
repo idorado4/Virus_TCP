@@ -69,37 +69,28 @@ void Manager() {
 
 		//enviar la info de los otros peers al nuevo
 		OutputMemoryStream oms;
-
-		std::string IP = sock->GetRemoteAdress();
-
-		oms.WriteString(IP);
-
+		
+		//Le envío el número de clientes que hay ya en la partida
 		int clientsSize = clients.size();
 		oms.Write(clientsSize);
+		std::cout << "Clients Sended " << clientsSize << std::endl;
+
+
+		std::string IP = sock->GetRemoteAdress();
 		uint16_t port = sock->GetRemotePort();
-		std::cout << "port que envio " << port << std::endl;
-		oms.Write(port);
+		std::cout << "Conneted Client Info: IP-> " << IP << " Puerto -> " << port << std::endl;
 
-		std::cout << "Clientes que envio " << clientsSize << std::endl;
-
-		
-
-
-
-
-		oms.WriteString(IP);
-
-		int uno = 1;
-
-		oms.Write(uno);
 
 		//le envio la info de los clientes en partida al nuevo
-		/*for (int i = 0; i < clients.size(); i++) {
-			oms.WriteString(clients[i].IP);
-			oms.Write(clients[i].PORT);
-		}*/
+		for (int i = 0; i < clients.size(); i++) {
+			std::string ipClient = clients[i].IP;
+			oms.WriteString(ipClient);
 
-		sock->Send(&oms);
+			uint16_t portClient = clients[i].PORT;
+			oms.Write(portClient);
+		}
+
+		status = sock->Send(&oms);
 
 		if (status != MyNetwork::Status::DONE) {
 			std::cout << "Error al enviar el mensaje" << std::endl;
@@ -110,13 +101,12 @@ void Manager() {
 
 		clients.push_back(newClient);
 
+		std::cout << "Current clients list: " << std::endl;
 		for (int i = 0; i < clients.size(); i++) {
-			std::cout << "Current clients list: " << clients[i].IP << " " << clients[i].PORT << std::endl;
+			std::cout << "IP->" << clients[i].IP << " PORT->" << clients[i].PORT << std::endl;
 		}
 
 		sock->Disconnect();
-
-		std::cout << clients.size() << std::endl;
 	}
 
 

@@ -36,59 +36,39 @@ int main() {
 //me conecto con los demas
 void Connections(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _clientes) {
 
+	MyNetwork::Status status;
 
-	//Hacemos conexion con los peers recibidos del server
-	InputMemoryStream* ims = nullptr;
-	//_sock->Receive(&ims);
+	//Creamos un contenedor rececptor de datos
+	InputMemoryStream* ims = nullptr;	
+
+	//Recibimos 
 	size_t br = 0;
 	char buffer[1000];
-	ims = _sock->Receive(buffer, 1000, br);
+	status = _sock->Receive(&ims, buffer, 1000, br);
 	
+	if (status != MyNetwork::Status::DONE) {
+		std::cout << "Error al recibir el mensaje" << std::endl;
+	}
 
+	int currentClients = 0;
+	ims->Read(&currentClients);
 
-	std::string IP = ims->ReadString();
+	std::vector<Player> players;
 
-	int clientes = 0;
-	ims->Read(&clientes);
-
-
-
-	uint16_t port;
-	ims->Read(&port);
-
-
-
-	std::string mss = ims->ReadString();
-
-	
-	int uno = 0;
-	ims->Read(&uno);
-
-
-
-
-
-	std::cout << "Recibido: " << clientes << std::endl;
-	std::cout << "Recibido: " << IP << std::endl;
-	std::cout << "Recibido: " << port << std::endl;
-	std::cout << "Recibido: " << mss << std::endl;
-	std::cout << "Recibido: " << uno << std::endl;
-
-	/*std::vector<Player> players;
-
+	//Hacemos conexion con los peers recibidos del server
 	for (int i = 0; i < currentClients; i++)
 	{
-		MyNetwork::Socket* client = new MyNetwork::Socket();
+		//MyNetwork::Socket* client = new MyNetwork::Socket();
 		std::string IP = "";
-		uint16_t port = 0;
-
 		IP = ims->ReadString();
+		
+		uint16_t port = 0;
 		ims->Read(&port);
 
 		std::cout << "Recibido: " << IP << " " << port << std::endl;
 		Player newPlayer = { IP, port };
 		players.push_back(newPlayer);
-	}*/
+	}
 	//Desconectas del servidor
 	_sock->Disconnect();
 

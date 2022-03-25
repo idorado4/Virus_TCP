@@ -37,6 +37,7 @@ public:
 		sf::TcpSocket* Get();
 		MyNetwork::Status Send(OutputMemoryStream* oms);
 		InputMemoryStream* Receive(char buffer[], int bufferSize, size_t br);
+		MyNetwork::Status MyNetwork::Socket::Receive(InputMemoryStream** ims, char buffer[], int bufferSize, size_t br);
 		std::string GetRemoteAdress();
 		uint16_t MyNetwork::Socket::GetRemotePort();
 		uint16_t MyNetwork::Socket::GetLocalPort();
