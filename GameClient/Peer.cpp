@@ -114,7 +114,7 @@ void Connections(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _cli
 			if (selector.IsReady(&listener)) {
 				// The listener is ready: there is a pending connection
 				MyNetwork::Socket* client = new MyNetwork::Socket;
-				if (listener.Accept(client) == sf::Socket::Done)
+				if (listener.Accept(client) == MyNetwork::Status::DONE)
 				{
 					// Add the new client to the clients list
 					std::cout << "Llega el cliente con IP: " << client->GetRemoteAdress() << std::endl;
