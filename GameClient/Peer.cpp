@@ -23,7 +23,7 @@ struct Room
 
 };
 
-enum Header { CREATE = 0, SHOW, ROOMS, SELECTEDROOM, COUNT };
+enum Header { CREATE = 0, SHOW, ROOMS, SELECTEDROOM, ACKJOIN };
 
 
 void ManageConnections(MyNetwork::Socket* _sock, MyNetwork::Selector& _selector);
@@ -31,6 +31,11 @@ void GameManager(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _cli
 void SendMessage(std::vector<MyNetwork::Socket*>* _clientes);
 void CreateRoom(MyNetwork::Socket* sock);
 void SearchForRoom(MyNetwork::Socket* sock);
+void SelectRoom(InputMemoryStream& ims, MyNetwork::Socket& _sock);
+void JoinRoom(InputMemoryStream& ims, MyNetwork::Socket& _sock);
+void JoinRoom(InputMemoryStream& ims, MyNetwork::Socket& _sock);
+void CreateOrSearchRoom(MyNetwork::Socket& sock);
+
 int main() {
 
 	std::cout << "Conectando al servidor" << std::endl;
@@ -46,6 +51,24 @@ int main() {
 		std::cout << "ERROR al establecer conexion" << std::endl;
 		std::cout << std::endl;
 	}
+
+	MyNetwork::Selector selector;
+	selector.Add(&sock);
+	std::vector<MyNetwork::Socket*> _clientes;
+
+	while (true)
+	{
+		CreateOrSearchRoom(sock);
+		ManageConnections(&sock, selector);
+	}
+
+	/*std::thread tMessage(SendMessage, &_clientes);
+tMessage.detach();*/
+
+	return 0;
+}
+
+void CreateOrSearchRoom(MyNetwork::Socket& sock) {
 	//CEAR o BUSCAR partida?
 	std::cout << "Pulsa 1 para crear partida" << std::endl;
 	std::cout << "Pulsa 2 para buscar partida" << std::endl;
@@ -56,7 +79,7 @@ int main() {
 	while (!correctComand) {
 		if (str == "1") { //crear partida
 			correctComand = true;
-			CreateRoom(&sock);
+			CreateRoom(&sock); //Cuando acaba esto, parar el bucle del main
 
 		}
 		else if (str == "2") { //buscar partida
@@ -70,22 +93,9 @@ int main() {
 			std::cout << "Pulsa 2 para buscar partida" << std::endl;
 
 			std::cin >> str;
-
 		}
 	}
-
-	MyNetwork::Selector selector;
-	selector.Add(&sock);
-	std::vector<MyNetwork::Socket*> _clientes;
-
-	/*std::thread tMessage(SendMessage, &_clientes);
-	tMessage.detach();*/
-
-	ManageConnections(&sock, selector);
-
-	return 0;
 }
-
 
 void GameManager(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _clientes) {
 
@@ -231,13 +241,10 @@ void GameManager(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _cli
 //me conecto con los demas
 void ManageConnections(MyNetwork::Socket* _sock, MyNetwork::Selector& _selector) {
 
-
-
 	MyNetwork::Status status;
-	std::vector<Room> roomList;
 
-	bool hasReceived = false;
-	while (!hasReceived)
+	bool connectedToBss = false;
+	while (!connectedToBss)
 	{
 		// Make the selector wait for data on any socket
 		if (_selector.Wait())
@@ -261,49 +268,104 @@ void ManageConnections(MyNetwork::Socket* _sock, MyNetwork::Selector& _selector)
 				switch (header)
 				{
 				case ROOMS:
-					hasReceived = true;
-					int numRooms;
-					ims->Read(&numRooms);
-					for (int i = 0; i < numRooms; i++)
-					{
-						Room newRoom;
-						newRoom.name = ims->ReadString();
-						ims->Read(&newRoom.hasPassword);
-						ims->Read(&newRoom.currentPlayers);
-						ims->Read(&newRoom.maxPlayers);
-						roomList.push_back(newRoom);
-					}
-
-
+					SelectRoom(*ims, *_sock);
+					break;
+				case ACKJOIN:
+					JoinRoom(*ims, *_sock);
 					break;
 				default:
 					break;
 				}
-
-
-
 			}
 		}
+		else {
+			//Conexiones entrantes
+		}
+
+
 	}
+
+}
+
+void SelectRoom(InputMemoryStream& ims, MyNetwork::Socket& _sock) {
+	std::vector<Room> roomList;
+	int numRooms;
+	ims.Read(&numRooms);
+	for (int i = 0; i < numRooms; i++)
+	{
+		Room newRoom;
+		newRoom.name = ims.ReadString();
+		ims.Read(&newRoom.hasPassword);
+		ims.Read(&newRoom.currentPlayers);
+		ims.Read(&newRoom.maxPlayers);
+		roomList.push_back(newRoom);
+	}
+
 	std::cout << std::endl;
 	std::cout << "----- LISTA DE SALAS ------" << std::endl;
 	std::cout << std::endl;
 	for (int i = 0; i < roomList.size(); i++)
 	{
 		std::cout << "SALA: " << roomList[i].name << std::endl;
-		
+
 		std::string hasPassword = roomList[i].hasPassword ? "true" : "false";
 		std::cout << "Contraseña:" << hasPassword << std::endl;
 		std::cout << "Jugadores: " << roomList[i].currentPlayers << "/" << roomList[i].maxPlayers << std::endl;
 		std::cout << std::endl;
 	}
 
-	while (true)
-	{
+	std::cout << "Escribe el nombre de la sala al que quieres unirte:" << std::endl;
+	std::string tempString;
+	Room selectedRoom;
+	bool correctSelectedRoom = false;
+	while (!correctSelectedRoom) {
+
+		std::cin >> tempString;
+		//recorro buscando si el nombre de la sala es correcto
+		for (int i = 0; i < roomList.size(); i++)
+		{
+			if (roomList[i].name == tempString) {
+				correctSelectedRoom = true;
+				selectedRoom = roomList[i];
+			}
+			std::cout << "Sala encontrada" << roomList[i].name << std::endl;
+		}
+
+		if (!correctSelectedRoom) {
+			std::cout << "Esta sala no existe" << std::endl;
+			std::cout << "Escribe el nombre de la sala al que quieres unirte:" << std::endl;
+		}
+	}
+
+	if (selectedRoom.hasPassword) {
+		std::cout << "Contrasenya de la sala: " << std::endl;
+		std::cin >> tempString;
+	}
+
+	//Enviamos la selectedRoom al BSS
+	OutputMemoryStream oms;
+	int headerType = 3;
+	oms.Write(headerType);
+	oms.WriteString(selectedRoom.name);
+	oms.WriteString(tempString);
+	_sock.Send(&oms);
+
+}
+
+void JoinRoom(InputMemoryStream& ims, MyNetwork::Socket& _sock) {
+
+	//Si recibo -1 es que no he conseguido entrar en la partida (por la contraseña)
+	int numPlayers;
+	ims.Read(&numPlayers);
+
+	if (numPlayers == -1) {
+		std::cout << "No has podido unirte a la partida. (Password incorrecta)" << std::endl;
 
 	}
 
+
 }
+
 void SendMessage(std::vector<MyNetwork::Socket*>* _clientes)
 {
 	while (true) {
@@ -316,6 +378,8 @@ void SendMessage(std::vector<MyNetwork::Socket*>* _clientes)
 			_clientes->at(i)->Send(&oms);
 		}
 	}
+
+
 }
 
 void CreateRoom(MyNetwork::Socket* sock) {
@@ -369,7 +433,7 @@ void CreateRoom(MyNetwork::Socket* sock) {
 
 	//sock->Disconnect();
 
-
+	//TODO tiene que ponerse a escuchar por el listener
 }
 
 void SearchForRoom(MyNetwork::Socket* sock) {
@@ -395,7 +459,6 @@ void SearchForRoom(MyNetwork::Socket* sock) {
 			std::cin >> tempString;
 			while (!correctComandNumPlayers)
 			{
-
 				if (tempString == "Y" || tempString == "y") {
 					correctComandNumPlayers = true;
 					std::cout << "Introduce el maximo de jugadores de la sala: (de 2 a 4)" << std::endl;
@@ -413,8 +476,6 @@ void SearchForRoom(MyNetwork::Socket* sock) {
 
 						}
 					}
-
-
 				}
 				else if (tempString == "N" || tempString == "n") {
 					oms.Write(-1);
@@ -426,7 +487,6 @@ void SearchForRoom(MyNetwork::Socket* sock) {
 					std::cin >> tempString;
 				}
 			}
-
 
 			std::cout << "Filtrar por partidas con contraseña? Y/N" << std::endl;
 			std::cin >> tempString;
@@ -445,11 +505,6 @@ void SearchForRoom(MyNetwork::Socket* sock) {
 					std::cin >> tempString;
 				}
 			}
-
-
-
-
-
 		}
 		else if (tempString == "N" || tempString == "n") {
 			correctComand = true;
@@ -465,23 +520,4 @@ void SearchForRoom(MyNetwork::Socket* sock) {
 	}
 
 	sock->Send(&oms);
-	//bool hasReceivedRooms = false;
-	//while (!hasReceivedRooms)
-	//{
-	//	if (selecctor->Wait()) {
-	//		if (selecctor->IsReady(sock)) {
-	//			hasReceivedRooms = true;
-	//			InputMemoryStream* ims;
-	//			char buffer[1000];
-	//			size_t br = 0;
-	//			sock->Receive(&ims, buffer, 1000, br);
-	//			std::cout << "Paquete recibido" << std::endl;
-	//			int header;
-	//			ims->Read(&header);
-
-
-	//		}
-	//	}
-	//}
-
 }

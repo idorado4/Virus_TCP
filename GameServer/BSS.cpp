@@ -7,7 +7,7 @@
 
 bool running;
 
-enum Header { CREATE = 0, SHOW, ROOMS, SELECTEDROOM, COUNT };
+enum Header { CREATE = 0, SHOW, ROOMS, SELECTEDROOM, ACKJOIN };
 
 //guardar internamente el socket??
 struct Peer
@@ -122,7 +122,7 @@ void Manager() {
 							newRoom.currentPlayers = 1;
 							newRoom.clients.push_back({ client->GetRemoteAdress(), client->GetRemotePort() });
 							rooms.push_back(newRoom);
-
+							//Gestionar desconexión del cliente 
 							break;
 						case SHOW:
 							std::cout << "el cliente quiere buscar partida" << std::endl;
@@ -133,10 +133,10 @@ void Manager() {
 							if (filterRooms) {
 								int maxPlayers;
 								ims->Read(&maxPlayers);
-								bool hasPassword;
-								ims->Read(&hasPassword);
+								bool passwordFilter;
+								ims->Read(&passwordFilter);
 								//Enviamos los filtros
-								ShowFilteredRooms(client, rooms, maxPlayers, hasPassword);
+								ShowFilteredRooms(client, rooms, maxPlayers, passwordFilter);
 							}
 							else {
 								ShowAllRooms(client, rooms);
@@ -147,9 +147,10 @@ void Manager() {
 							break;
 
 						case SELECTEDROOM:
+
+
 							break;
-						case COUNT:
-							break;
+						
 						default:
 							break;
 						}
@@ -204,14 +205,88 @@ void Manager() {
 
 }
 
-void ShowFilteredRooms(MyNetwork::Socket* client, std::vector<Room>& rooms, int maxPlayers, bool hasPassword) {
+void ShowFilteredRooms(MyNetwork::Socket* client, std::vector<Room>& rooms, int maxPlayers, bool passwordFilter) {
 
+	OutputMemoryStream oms;
+	oms.Write(2);
+	std::vector<std::string> tempNames;
+	std::vector<int> tempCurrentPlayers;
+	
 
-	if (maxPlayers != -1) {
-
+	int numRooms = 0;
+	
+	for (int i = 0; i < rooms.size(); i++)
+	{
+		if (passwordFilter) {
+			switch (maxPlayers)
+			{
+				case 2:
+					if (rooms[i].maxPlayers == 2 && rooms[i].password != "") {
+						numRooms++;
+						tempNames.push_back(rooms[i].name);
+						tempCurrentPlayers.push_back(rooms[i].currentPlayers);
+					}
+					break;
+				case 3:
+					if (rooms[i].maxPlayers == 3 && rooms[i].password != "") {
+						numRooms++;
+						tempNames.push_back(rooms[i].name);
+						tempCurrentPlayers.push_back(rooms[i].currentPlayers);
+					}
+					break;
+				case 4:
+					if (rooms[i].maxPlayers == 4 && rooms[i].password != "") {
+						numRooms++;
+						tempNames.push_back(rooms[i].name);
+						tempCurrentPlayers.push_back(rooms[i].currentPlayers);
+					}
+					break;
+			default:
+				break;
+			}
+		}
+		else {
+			switch (maxPlayers)
+			{
+			case 2:
+				if (rooms[i].maxPlayers == 2 && rooms[i].password == "") {
+					numRooms++;
+					tempNames.push_back(rooms[i].name);
+					tempCurrentPlayers.push_back(rooms[i].currentPlayers);
+				}
+				break;
+			case 3:
+				if (rooms[i].maxPlayers == 3 && rooms[i].password == "") {
+					numRooms++;
+					tempNames.push_back(rooms[i].name);
+					tempCurrentPlayers.push_back(rooms[i].currentPlayers);
+				}
+				break;
+			case 4:
+				if (rooms[i].maxPlayers == 4 && rooms[i].password == "") {
+					numRooms++;
+					tempNames.push_back(rooms[i].name);
+					tempCurrentPlayers.push_back(rooms[i].currentPlayers);
+				}
+				break;
+			default:
+				break;
+			}
+		}
 	}
 
 
+	oms.Write(numRooms);
+	
+	for (int i = 0; i < numRooms; i++) {
+		oms.WriteString(tempNames[i]);
+		oms.Write(passwordFilter);
+		oms.Write(tempCurrentPlayers[i]);
+		oms.Write(maxPlayers);
+
+	}
+
+	client->Send(&oms);
 }
 
 void ShowAllRooms(MyNetwork::Socket* client, std::vector<Room>& rooms) {
@@ -223,7 +298,7 @@ void ShowAllRooms(MyNetwork::Socket* client, std::vector<Room>& rooms) {
 	{
 		std::string roomName = rooms[i].name;
 		oms.WriteString(roomName);
-		bool hasPassword = rooms[i].password == "";
+		bool hasPassword = rooms[i].password != "";
 		oms.Write(hasPassword);	
 		int currentPlayers = rooms[i].currentPlayers;
 		oms.Write(currentPlayers);
