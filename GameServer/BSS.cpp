@@ -35,6 +35,7 @@ struct Room
 void Manager();
 void ShowFilteredRooms(MyNetwork::Socket* client, std::vector<Room>& rooms, int maxPlayers, bool hasPassword);
 void ShowAllRooms(MyNetwork::Socket* client, std::vector<Room>& rooms);
+void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwork::Socket* client);
 
 int main() {
 
@@ -170,6 +171,10 @@ void Manager() {
 
 						case SELECTEDROOM:
 							std::cout << "Ha seleccionado una sala\n";
+							JoinSelectedRoom(*ims, rooms, client);
+
+
+
 
 							break;
 
@@ -225,6 +230,36 @@ void Manager() {
 	//}
 	//sock->Disconnect();
 
+}
+
+void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwork::Socket* client) {
+	std::string nameRoom = ims.ReadString();
+	std::string password = ims.ReadString();
+	OutputMemoryStream oms;
+	oms.Write(4);
+	for (int i = 0; i < rooms.size(); i++) {
+		if (rooms[i].name == nameRoom) {
+			if (rooms[i].password == password) {
+				//he encontrado la sala 
+				//la contraseña es correcta
+				std::cout << "contraseña correcta" << std::endl;
+				oms.Write(rooms[i].currentPlayers);
+				for (int j = 0; j < rooms[i].clients.size(); j++)
+				{
+					oms.WriteString(rooms[i].clients[j].IP);
+					oms.Write(rooms[i].clients[j].PORT);
+				}
+			}
+			else {
+				//la contraseña NO es correcta
+				std::cout << "contraseña incorrecta" << std::endl;
+				oms.Write(-1);
+			}
+		}
+	}
+
+	std::cout << "envio paquete" << std::endl;
+	client->Send(&oms);
 }
 
 void ShowFilteredRooms(MyNetwork::Socket* client, std::vector<Room>& rooms, int maxPlayers, bool passwordFilter) {
