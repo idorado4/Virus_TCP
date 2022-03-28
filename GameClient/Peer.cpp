@@ -26,14 +26,13 @@ struct Room
 enum Header { CREATE = 0, SHOW, ROOMS, SELECTEDROOM, ACKJOIN, CHAT };
 
 
-void ManageConnections(MyNetwork::Selector& _selector, std::vector<MyNetwork::Socket*>& connections);
-void GameManager(MyNetwork::Socket* _sock, std::vector<MyNetwork::Socket*>* _clientes);
+void ManageConnections(MyNetwork::Selector& _selector, std::vector<MyNetwork::Socket*>& connections, MyNetwork::Listener* listener);
 void SendMessage(std::vector<MyNetwork::Socket*>* _clientes);
-void CreateRoom(MyNetwork::Socket* sock, std::vector<MyNetwork::Socket*>& connections);
+void CreateRoom(MyNetwork::Socket* sock, std::vector<MyNetwork::Socket*>& connections, MyNetwork::Listener* listener, MyNetwork::Selector& _selector);
 void SearchForRoom(MyNetwork::Socket* sock);
 void SelectRoom(InputMemoryStream& ims, MyNetwork::Socket* _sock);
 bool JoinRoom(InputMemoryStream& ims, MyNetwork::Socket* sockToBss, std::vector<MyNetwork::Socket*> connections, MyNetwork::Selector& _selector, MyNetwork::Listener* listener);
-void CreateOrSearchRoom(MyNetwork::Socket* sock, std::vector<MyNetwork::Socket*>& connections);
+void CreateOrSearchRoom(MyNetwork::Socket* sock, std::vector<MyNetwork::Socket*>& connections, MyNetwork::Listener* listener, MyNetwork::Selector& _selector);
 
 
 int main() {
@@ -56,13 +55,14 @@ int main() {
 	selector.Add(sock);
 	std::vector<MyNetwork::Socket*> conexiones;
 	conexiones.push_back(std::move(sock));
-
+	
+	MyNetwork::Listener* listener = new MyNetwork::Listener();
 
 
 	while (true)
 	{
-		CreateOrSearchRoom(sock, conexiones);
-		ManageConnections(selector, conexiones);
+		CreateOrSearchRoom(sock, conexiones, listener, selector);
+		ManageConnections(selector, conexiones, listener);
 	}
 
 
@@ -70,7 +70,7 @@ int main() {
 	return 0;
 }
 
-void CreateOrSearchRoom(MyNetwork::Socket* sock, std::vector<MyNetwork::Socket*>& connections) {
+void CreateOrSearchRoom(MyNetwork::Socket* sock, std::vector<MyNetwork::Socket*>& connections, MyNetwork::Listener* listener, MyNetwork::Selector& selector) {
 	//CEAR o BUSCAR partida?
 	std::cout << "Pulsa 1 para crear partida" << std::endl;
 	std::cout << "Pulsa 2 para buscar partida" << std::endl;
@@ -81,7 +81,7 @@ void CreateOrSearchRoom(MyNetwork::Socket* sock, std::vector<MyNetwork::Socket*>
 	while (!correctComand) {
 		if (str == "1") { //crear partida
 			correctComand = true;
-			CreateRoom(sock, connections); //Cuando acaba esto, parar el bucle del main
+			CreateRoom(sock, connections, listener, selector); //Cuando acaba esto, parar el bucle del main
 
 		}
 		else if (str == "2") { //buscar partida
@@ -103,13 +103,11 @@ void CreateOrSearchRoom(MyNetwork::Socket* sock, std::vector<MyNetwork::Socket*>
 //me da la info de los demas
 //me desconecto del server
 //me conecto con los demas
-void ManageConnections(MyNetwork::Selector& _selector, std::vector<MyNetwork::Socket*>& connections) {
+void ManageConnections(MyNetwork::Selector& _selector, std::vector<MyNetwork::Socket*>& connections, MyNetwork::Listener* listener) {
 
 	MyNetwork::Status status;
 
 	bool connectedToBss = true;
-
-	MyNetwork::Listener* listener = new MyNetwork::Listener();
 
 	while (connectedToBss)
 	{
@@ -256,7 +254,15 @@ bool JoinRoom(InputMemoryStream& ims, MyNetwork::Socket* sockToBss, std::vector<
 		uint16_t portReceived;
 		ims.Read(&portReceived);
 		MyNetwork::Socket* newClient = new MyNetwork::Socket();
-		newClient->Connect(IPReceived, portReceived);
+			std::cout << "Recibido: IP->" << IPReceived << " PORT->" << portReceived << std::endl;
+		MyNetwork::Status status = newClient->Connect(IPReceived, portReceived);
+		if (status == MyNetwork::Status::DONE) {
+			std::cout << "Me conecto al cliente: IP->" << newClient->GetRemoteAdress() << " PORT->" << newClient->GetRemotePort() << std::endl;
+		}
+		else {
+			std::cout << "Error al conectar con el cliente recibido" << std::endl;
+
+		}
 		connections.push_back(std::move(newClient));
 		_selector.Add(newClient);
 	}
@@ -304,7 +310,7 @@ void SendMessage(std::vector<MyNetwork::Socket*>* _clientes)
 	}
 }
 
-void CreateRoom(MyNetwork::Socket* sock, std::vector<MyNetwork::Socket*>& connections) {
+void CreateRoom(MyNetwork::Socket* sock, std::vector<MyNetwork::Socket*>& connections, MyNetwork::Listener* listener, MyNetwork::Selector& selector) {
 
 	OutputMemoryStream oms;
 	int headerType = 0;
@@ -353,13 +359,19 @@ void CreateRoom(MyNetwork::Socket* sock, std::vector<MyNetwork::Socket*>& connec
 	sock->Send(&oms);
 	std::cout << "MENSAJE ENVIADO" << std::endl;
 
+	uint16_t listenerPort = sock->GetLocalPort();
 	sock->Disconnect();
 
 	//abro el chat
 	std::thread tMessage(SendMessage, &connections);
 	tMessage.detach();
 
-	//TODO tiene que ponerse a escuchar por el listener
+
+	//Empiezo a escuchar por el puerto del sock descontado (listener)
+	listener->Listen(listenerPort);
+	//añado listener al selector
+	selector.Add(listener);
+
 }
 
 void SearchForRoom(MyNetwork::Socket* sock) {
