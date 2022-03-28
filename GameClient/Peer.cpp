@@ -8,6 +8,16 @@
 
 bool end;
 
+
+enum Type { ORGANO, VIRUS, MEDICINA, TRATAMIENTO };
+
+enum Color { VERDE, ROJO, AZUL, AMARILLO, COMODIN };
+
+struct Card {
+	Type type;
+	Color color;
+
+};
 struct Player {
 	std::string IP;
 	uint16_t PORT;
@@ -22,16 +32,17 @@ struct Room
 	int currentPlayers;
 	//Los clientes conectados
 	std::vector<Player> clients;
-
 };
 
 //La partida como tal
 struct Game {
 	int currentPlayers;
 	int maxPlayers;
+	int seed;
 	//Informacion de la partida
-
+	std::vector<Card*>* deck;
 };
+
 
 enum Header { CREATE = 0, SHOW, ROOMS, SELECTEDROOM, ACKJOIN, CHAT, ACKCREATE };
 
@@ -45,6 +56,8 @@ bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std
 bool AcknowledgeCreate(InputMemoryStream*& ims, MyNetwork::Socket*& sock, MyNetwork::Listener*& listener, MyNetwork::Selector*& selector, std::vector<MyNetwork::Socket*>*& connections, Game*& game);
 
 void SendMessage(std::vector<MyNetwork::Socket*>* conexiones);
+void Shuffle(Game*& game);
+void Deal(Game*& game);
 
 
 int main() {
@@ -135,8 +148,11 @@ void ManageConnections(MyNetwork::Selector*& selector, MyNetwork::Socket*& sockT
 					//be notified when he sends something
 					selector->Add(connection);
 
-
 					//TODO GESTION DE LISTENER CON SALA COMPLETA
+					if (game->currentPlayers == game->maxPlayers) {
+						Shuffle(game);
+						Deal(game);
+					}
 				}
 				else {
 					delete connection;
@@ -229,6 +245,11 @@ bool AcknowledgeCreate(InputMemoryStream*& ims, MyNetwork::Socket*& sock, MyNetw
 	ims->Read(&ackCreate);
 	int maxPlayers;
 	ims->Read(&maxPlayers);
+	game = new Game();
+	game->seed = sock->GetLocalPort();
+	std::cout << std::endl;
+	std::cout << "SEED: " << game->seed << std::endl;
+	std::cout << std::endl;
 	if (ackCreate) {
 		std::cout << "Puedo crear una sala\n";
 
@@ -246,7 +267,7 @@ bool AcknowledgeCreate(InputMemoryStream*& ims, MyNetwork::Socket*& sock, MyNetw
 		//abro el chat
 		std::thread tMessage(SendMessage, connections);
 		tMessage.detach();
-		game = new Game();
+
 		game->currentPlayers = 1;
 		game->maxPlayers = maxPlayers;
 	}
@@ -330,6 +351,7 @@ bool SelectRoom(InputMemoryStream*& ims, MyNetwork::Socket*& _sock) {
 }
 
 bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Selector*& selector, MyNetwork::Listener*& listener, Game*& game) {
+	game = new Game();
 	//Si recibo -1 es que no he conseguido entrar en la partida (contraseña/sala llena)
 	int numPlayers;
 	ims->Read(&numPlayers);
@@ -337,6 +359,12 @@ bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std
 	int maxPlayers;
 	ims->Read(&maxPlayers);
 
+	int seed;
+	ims->Read(&seed);
+	game->seed = seed;
+	std::cout << std::endl;
+	std::cout << "SEED: " << game->seed << std::endl;
+	std::cout << std::endl;
 	if (numPlayers == -1) {
 		std::cout << "No has podido unirte a la partida." << std::endl;
 		return false;
@@ -365,6 +393,7 @@ bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std
 		selector->Add(newClient);
 	}
 
+
 	//Me guardo el puerto del socket porqe ponemos a escuchar al listener por este
 	uint16_t listenerPort = sockToBss->GetLocalPort();
 	//Me desconecto del server
@@ -379,10 +408,12 @@ bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std
 
 	//TODO GESTION DEL LISTENER CUANDO LA SALA ESTA LLENA
 	if (numPlayers == maxPlayers) {
-		game = new Game();
-		game->currentPlayers = numPlayers ;
+
+		game->currentPlayers = numPlayers;
 		game->maxPlayers = maxPlayers;
 		std::cout << "No abro el listener porque ya estamos todos" << std::endl;
+		delete listener;
+		listener = nullptr;
 	}
 	else {
 		//Empiezo a escuchar por el puerto del sock descontado (listener)
@@ -559,4 +590,89 @@ void SearchForRoom(MyNetwork::Socket*& sock) {
 
 	std::cout << "Envio los filtros al server\n";
 	sock->Send(&oms);
+}
+
+void Shuffle(Game*& game) {
+
+	std::vector<Card*>* deck = new std::vector<Card*>();
+	//organos
+	for (int i = 0; i < 21; i++) {
+		if (i >= 0 && i < 5) {
+			Card* newCard = new Card{ Type::ORGANO, Color::ROJO };
+			deck->push_back(newCard);
+		}
+		else if (i >= 5 && i < 10) {
+			Card* newCard = new Card{ Type::ORGANO, Color::VERDE };
+			deck->push_back(newCard);
+		}
+		else if (i >= 10 && i < 15) {
+			Card* newCard = new Card{ Type::ORGANO, Color::AZUL };
+			deck->push_back(newCard);
+		}
+		else if (i >= 15 && i < 20) {
+			Card* newCard = new Card{ Type::ORGANO, Color::AMARILLO };
+			deck->push_back(newCard);
+		}
+		else {
+			Card* newCard = new Card{ Type::ORGANO, Color::COMODIN };
+			deck->push_back(newCard);
+		}
+	}
+
+	//VIRUS
+	for (int i = 0; i < 17; i++) {
+		if (i >= 0 && i < 4) {
+			Card* newCard = new Card{ Type::VIRUS, Color::ROJO };
+			deck->push_back(newCard);
+		}
+		else if (i >= 4 && i < 8) {
+			Card* newCard = new Card{ Type::VIRUS, Color::VERDE };
+			deck->push_back(newCard);
+		}
+		else if (i >= 8 && i < 12) {
+			Card* newCard = new Card{ Type::VIRUS, Color::AZUL };
+			deck->push_back(newCard);
+		}
+		else if (i >= 12 && i < 16) {
+			Card* newCard = new Card{ Type::VIRUS, Color::AMARILLO };
+			deck->push_back(newCard);
+		}
+		else {
+			Card* newCard = new Card{ Type::VIRUS, Color::COMODIN };
+			deck->push_back(newCard);
+		}
+	}
+	//MEDICINAS
+	for (int i = 0; i < 20; i++) {
+		if (i >= 0 && i < 4) {
+			Card* newCard = new Card{ Type::VIRUS, Color::ROJO };
+			deck->push_back(newCard);
+		}
+		else if (i >= 4 && i < 8) {
+			Card* newCard = new Card{ Type::VIRUS, Color::VERDE };
+			deck->push_back(newCard);
+		}
+		else if (i >= 8 && i < 12) {
+			Card* newCard = new Card{ Type::VIRUS, Color::AZUL };
+			deck->push_back(newCard);
+		}
+		else if (i >= 12 && i < 16) {
+			Card* newCard = new Card{ Type::VIRUS, Color::AMARILLO };
+			deck->push_back(newCard);
+		}
+		else {
+			Card* newCard = new Card{ Type::VIRUS, Color::COMODIN };
+			deck->push_back(newCard);
+		}
+	}
+	srand(game->seed);
+
+
+	for (int i = 0; i < deck->size(); i++) {
+		int random = rand() % deck->size();
+		std::swap(deck[i], deck[random]);
+	}
+
+	game->deck = deck;
+
 }

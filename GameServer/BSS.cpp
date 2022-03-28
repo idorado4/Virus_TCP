@@ -29,6 +29,7 @@ struct Room
 	std::string password;
 	int maxPlayers;
 	int currentPlayers;
+	int seed;
 	//Los clientes conectados
 	std::vector<Peer> clients;
 
@@ -204,6 +205,9 @@ void AcknowledgeCreate(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwo
 	std::cout << "No existe una sala con ese nombre, la creamos" << std::endl;
 	oms.Write(true);
 	oms.Write(newRoom.maxPlayers);
+	newRoom.seed = (int)client->GetRemotePort();
+	
+	
 
 	client->Send(&oms);
 
@@ -213,6 +217,7 @@ void AcknowledgeCreate(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwo
 	std::cout << "Nombre sala:" << newRoom.name << std::endl;
 	std::cout << "Contraseña: -" << newRoom.password << "-" << std::endl;
 	std::cout << "maxplayers: " << newRoom.maxPlayers << std::endl;
+	std::cout << "seed: " << newRoom.seed << std::endl;
 
 	mtxRoom.lock();
 	rooms.push_back(newRoom);
@@ -234,10 +239,13 @@ void AcknowledgeCreate(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwo
 }
 
 void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwork::Socket* client) {
+
 	std::string nameRoom = ims.ReadString();
 	std::string password = ims.ReadString();
+
 	OutputMemoryStream oms;
 	oms.Write((int)Header::ACKJOIN);
+
 	mtxRoom.lock();
 	for (int i = 0; i < rooms.size(); i++) {
 		if (rooms[i].name == nameRoom) {
@@ -249,12 +257,17 @@ void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwor
 					std::cout << "contraseña correcta" << std::endl;
 					oms.Write(rooms[i].currentPlayers);
 					oms.Write(rooms[i].maxPlayers);
+
+					int seed = rooms[i].seed;
+					std::cout << "seed que mando " << seed << std::endl;
+					oms.Write(seed);
 					rooms[i].clients.push_back({ client->GetRemoteAdress(),client->GetRemotePort() });
 					for (int j = 0; j < rooms[i].clients.size(); j++)
 					{
 						oms.WriteString(rooms[i].clients[j].IP);
 						oms.Write(rooms[i].clients[j].PORT);
 					}
+				
 
 					rooms[i].currentPlayers++;
 					//Compruebo si la sala esta llena, y si es asi la elimino
