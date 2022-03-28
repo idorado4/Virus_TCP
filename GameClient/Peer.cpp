@@ -55,7 +55,7 @@ int main() {
 	selector.Add(sock);
 	std::vector<MyNetwork::Socket*> conexiones;
 	conexiones.push_back(std::move(sock));
-	
+
 	MyNetwork::Listener* listener = new MyNetwork::Listener();
 
 
@@ -152,6 +152,7 @@ void ManageConnections(MyNetwork::Selector& _selector, std::vector<MyNetwork::So
 						break;
 					}
 				}
+				//else if EL SOCK AL BSS
 				else //listener
 				{
 					MyNetwork::Socket* connection = new MyNetwork::Socket();
@@ -254,7 +255,7 @@ bool JoinRoom(InputMemoryStream& ims, MyNetwork::Socket* sockToBss, std::vector<
 		uint16_t portReceived;
 		ims.Read(&portReceived);
 		MyNetwork::Socket* newClient = new MyNetwork::Socket();
-			std::cout << "Recibido: IP->" << IPReceived << " PORT->" << portReceived << std::endl;
+		std::cout << "Recibido: IP->" << IPReceived << " PORT->" << portReceived << std::endl;
 		MyNetwork::Status status = newClient->Connect(IPReceived, portReceived);
 		if (status == MyNetwork::Status::DONE) {
 			std::cout << "Me conecto al cliente: IP->" << newClient->GetRemoteAdress() << " PORT->" << newClient->GetRemotePort() << std::endl;
@@ -299,7 +300,7 @@ void SendMessage(std::vector<MyNetwork::Socket*>* _clientes)
 		std::cout << "Introduce mensaje" << std::endl;
 		//OMS SEND PACKET
 		OutputMemoryStream oms;
-		oms.Write(5);
+		oms.Write((int)Header::CHAT);
 		std::string message;
 		std::cin >> message;
 		oms.WriteString(message);

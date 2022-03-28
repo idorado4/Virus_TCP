@@ -236,7 +236,7 @@ void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwor
 	std::string nameRoom = ims.ReadString();
 	std::string password = ims.ReadString();
 	OutputMemoryStream oms;
-	oms.Write(4);
+	oms.Write((int)Header::ACKJOIN);
 	for (int i = 0; i < rooms.size(); i++) {
 		if (rooms[i].name == nameRoom) {
 			if (rooms[i].password == password) {
@@ -265,7 +265,7 @@ void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwor
 void ShowFilteredRooms(MyNetwork::Socket* client, std::vector<Room>& rooms, int maxPlayers, bool passwordFilter) {
 
 	OutputMemoryStream oms;
-	oms.Write(2);
+	oms.Write((int)Header::ROOMS);
 	std::vector<std::string> tempNames;
 	std::vector<int> tempCurrentPlayers;
 
@@ -348,7 +348,7 @@ void ShowFilteredRooms(MyNetwork::Socket* client, std::vector<Room>& rooms, int 
 
 void ShowAllRooms(MyNetwork::Socket* client, std::vector<Room>& rooms) {
 	OutputMemoryStream oms;
-	oms.Write(2);
+	oms.Write((int)Header::ROOMS);
 	int numRooms = rooms.size();
 	oms.Write(numRooms);
 	for (int i = 0; i < rooms.size(); i++)
