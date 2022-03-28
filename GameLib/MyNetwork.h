@@ -60,6 +60,7 @@ public:
 		bool IsReady(MyNetwork::Listener* listener);
 		bool IsReady(MyNetwork::Socket* socket);
 		void Remove(MyNetwork::Socket* socket);
+		void Remove(MyNetwork::Listener* listener);
 
 	};
 

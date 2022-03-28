@@ -16,10 +16,12 @@ struct Peer
 {
 	std::string IP;
 	uint16_t PORT; //Unsigned Short
+	int ID;
 
-	Peer(std::string _ip, uint16_t _port) {
+	Peer(std::string _ip, uint16_t _port, int _id) {
 		IP = _ip;
 		PORT = _port;
+		ID = _id;
 	}
 };
 
@@ -75,6 +77,7 @@ void Manager() {
 		std::cin >> exit;
 		return;
 	}
+	std::cout << "Escuchando por el puerto 50000" << std::endl;
 
 
 	MyNetwork::Selector selector;
@@ -206,13 +209,13 @@ void AcknowledgeCreate(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwo
 	oms.Write(true);
 	oms.Write(newRoom.maxPlayers);
 	newRoom.seed = (int)client->GetRemotePort();
-	
-	
+
+
 
 	client->Send(&oms);
 
 	newRoom.currentPlayers = 1;
-	newRoom.clients.push_back({ client->GetRemoteAdress(), client->GetRemotePort() });
+	newRoom.clients.push_back({ client->GetRemoteAdress(), client->GetRemotePort(), 1 });
 
 	std::cout << "Nombre sala:" << newRoom.name << std::endl;
 	std::cout << "Contraseña: -" << newRoom.password << "-" << std::endl;
@@ -261,13 +264,14 @@ void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwor
 					int seed = rooms[i].seed;
 					std::cout << "seed que mando " << seed << std::endl;
 					oms.Write(seed);
-					rooms[i].clients.push_back({ client->GetRemoteAdress(),client->GetRemotePort() });
+					rooms[i].clients.push_back({ client->GetRemoteAdress(),client->GetRemotePort(), rooms[i].currentPlayers + 1 });
 					for (int j = 0; j < rooms[i].clients.size(); j++)
 					{
 						oms.WriteString(rooms[i].clients[j].IP);
 						oms.Write(rooms[i].clients[j].PORT);
+						oms.Write(rooms[i].clients[j].ID);
 					}
-				
+
 
 					rooms[i].currentPlayers++;
 					//Compruebo si la sala esta llena, y si es asi la elimino

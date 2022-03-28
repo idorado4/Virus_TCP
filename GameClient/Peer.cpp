@@ -16,11 +16,18 @@ enum Color { VERDE, ROJO, AZUL, AMARILLO, COMODIN };
 struct Card {
 	Type type;
 	Color color;
-
+	int ID;
 };
-struct Player {
+struct Peer {
 	std::string IP;
 	uint16_t PORT;
+};
+
+struct Player {
+	Card* hand[3];
+	bool turn;
+	std::vector<Card*> table;
+	int ID;
 };
 
 //Se usa para la gestión de salas
@@ -30,8 +37,6 @@ struct Room
 	bool hasPassword;
 	int maxPlayers;
 	int currentPlayers;
-	//Los clientes conectados
-	std::vector<Player> clients;
 };
 
 //La partida como tal
@@ -40,7 +45,10 @@ struct Game {
 	int maxPlayers;
 	int seed;
 	//Informacion de la partida
+	int localId;
 	std::vector<Card*>* deck;
+	std::vector<Card*> discardPile; // = new std::vector<Card*>;
+	std::vector<Player> players;
 };
 
 
@@ -129,6 +137,7 @@ void CreateOrSearchRoom(MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::So
 //me desconecto del server
 //me conecto con los demas
 void ManageConnections(MyNetwork::Selector*& selector, MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Listener*& listener, Game*& game) {
+	
 	MyNetwork::Status status;
 
 	bool returnMenu = false;
@@ -142,14 +151,20 @@ void ManageConnections(MyNetwork::Selector*& selector, MyNetwork::Socket*& sockT
 			{
 				MyNetwork::Socket* connection = new MyNetwork::Socket();
 				if (listener->Accept(connection) == MyNetwork::Status::DONE) {
+
 					std::cout << "Se ha establecido conexion!" << std::endl;
+
 					connections->push_back(std::move(connection));
-					//Add the new client to the selector so that we will
-					//be notified when he sends something
+
+					//Add the new client to the selector so that we will be notified when he sends something
 					selector->Add(connection);
 
 					//TODO GESTION DE LISTENER CON SALA COMPLETA
 					if (game->currentPlayers == game->maxPlayers) {
+
+						selector->Remove(listener);
+						delete listener;
+						listener = nullptr;
 						Shuffle(game);
 						Deal(game);
 					}
@@ -267,9 +282,13 @@ bool AcknowledgeCreate(InputMemoryStream*& ims, MyNetwork::Socket*& sock, MyNetw
 		//abro el chat
 		std::thread tMessage(SendMessage, connections);
 		tMessage.detach();
-
 		game->currentPlayers = 1;
 		game->maxPlayers = maxPlayers;
+
+		Player newPlayer;
+		newPlayer.ID = 1;
+		game->players.push_back(newPlayer);
+
 	}
 	else std::cout << "No puedo crear una sala\n";
 
@@ -376,9 +395,14 @@ bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std
 	{
 		std::string IPReceived;
 		IPReceived = ims->ReadString();
+
 		uint16_t portReceived;
 		ims->Read(&portReceived);
-		std::cout << "Recibido: IP->" << IPReceived << " PORT->" << portReceived << std::endl;
+
+		int IDReceived;
+		ims->Read(&IDReceived);
+
+		std::cout << "Recibido: IP->" << IPReceived << " PORT->" << portReceived << " ID->" << IDReceived << std::endl;
 
 		MyNetwork::Socket* newClient = new MyNetwork::Socket();
 		MyNetwork::Status status = newClient->Connect(IPReceived, portReceived);
@@ -391,8 +415,25 @@ bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std
 		}
 		connections->push_back(std::move(newClient));
 		selector->Add(newClient);
+
+		Player newPlayer;
+		newPlayer.ID = IDReceived;
+		game->players.push_back(newPlayer);
+
+
 	}
 
+	Player localPlayer;
+	localPlayer.ID = game->players.size() + 1;
+	game->localId = localPlayer.ID;
+	game->players.push_back(localPlayer);
+
+
+	std::cout << "Hay en el game:" << std::endl;
+	for (int i = 0; i < game->players.size(); i++)
+	{
+		std::cout << "Player " << game->players[i].ID << std::endl;
+	}
 
 	//Me guardo el puerto del socket porqe ponemos a escuchar al listener por este
 	uint16_t listenerPort = sockToBss->GetLocalPort();
@@ -675,4 +716,21 @@ void Shuffle(Game*& game) {
 
 	game->deck = deck;
 
+}
+
+void Deal(Game*& game) {
+
+	int dealToPlayerNum = 0;
+	int dealedCards = 0;
+	for (int i = 0; i < game->currentPlayers; i++)
+	{
+		while (dealedCards < 3)
+		{
+			game->players.at(dealToPlayerNum).hand[dealedCards] = game->deck->at(0);
+			game->deck->erase(game->deck->begin());
+			dealedCards++;
+		}
+		dealToPlayerNum++;
+		dealedCards = 0;
+	}
 }

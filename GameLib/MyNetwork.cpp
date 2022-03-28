@@ -141,6 +141,10 @@ void MyNetwork::Selector::Remove(MyNetwork::Socket* socket)
 {
 	mySelector->remove(*socket->Get());
 }
+void MyNetwork::Selector::Remove(MyNetwork::Listener* listener)
+{
+	mySelector->remove(*listener->Get());
+}
 
 
 #pragma endregion
