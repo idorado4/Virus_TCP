@@ -203,6 +203,7 @@ void AcknowledgeCreate(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwo
 
 	std::cout << "No existe una sala con ese nombre, la creamos" << std::endl;
 	oms.Write(true);
+	oms.Write(newRoom.maxPlayers);
 
 	client->Send(&oms);
 
@@ -246,8 +247,8 @@ void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwor
 				if (rooms[i].currentPlayers != rooms[i].maxPlayers) {
 
 					std::cout << "contraseña correcta" << std::endl;
-					rooms[i].currentPlayers++;
 					oms.Write(rooms[i].currentPlayers);
+					oms.Write(rooms[i].maxPlayers);
 					rooms[i].clients.push_back({ client->GetRemoteAdress(),client->GetRemotePort() });
 					for (int j = 0; j < rooms[i].clients.size(); j++)
 					{
@@ -255,6 +256,7 @@ void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwor
 						oms.Write(rooms[i].clients[j].PORT);
 					}
 
+					rooms[i].currentPlayers++;
 					//Compruebo si la sala esta llena, y si es asi la elimino
 					if (rooms[i].currentPlayers == rooms[i].maxPlayers) {
 						rooms.erase(rooms.begin() + i);

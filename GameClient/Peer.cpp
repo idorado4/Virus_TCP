@@ -37,12 +37,12 @@ enum Header { CREATE = 0, SHOW, ROOMS, SELECTEDROOM, ACKJOIN, CHAT, ACKCREATE };
 
 
 void CreateRoom(MyNetwork::Socket*& sock, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Listener*& listener, MyNetwork::Selector*& selector);
-void ManageConnections(MyNetwork::Selector*& selector, MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Listener*& listener);
+void ManageConnections(MyNetwork::Selector*& selector, MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Listener*& listener, Game*& game);
 void CreateOrSearchRoom(MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Listener*& listener, MyNetwork::Selector*& selector);
 void SearchForRoom(MyNetwork::Socket*& sock);
 bool SelectRoom(InputMemoryStream*& ims, MyNetwork::Socket*& _sock);
-bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Selector*& selector, MyNetwork::Listener*& listener);
-bool AcknowledgeCreate(InputMemoryStream*& ims, MyNetwork::Socket*& sock, MyNetwork::Listener*& listener, MyNetwork::Selector*& selector, std::vector<MyNetwork::Socket*>*& connections);
+bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Selector*& selector, MyNetwork::Listener*& listener, Game*& game);
+bool AcknowledgeCreate(InputMemoryStream*& ims, MyNetwork::Socket*& sock, MyNetwork::Listener*& listener, MyNetwork::Selector*& selector, std::vector<MyNetwork::Socket*>*& connections, Game*& game);
 
 void SendMessage(std::vector<MyNetwork::Socket*>* conexiones);
 
@@ -76,7 +76,7 @@ int main() {
 	while (!end)
 	{
 		CreateOrSearchRoom(sock, conexiones, listener, selector);
-		ManageConnections(selector, sock, conexiones, listener);
+		ManageConnections(selector, sock, conexiones, listener, game);
 	}
 
 	return 0;
@@ -115,7 +115,7 @@ void CreateOrSearchRoom(MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::So
 //me da la info de los demas
 //me desconecto del server
 //me conecto con los demas
-void ManageConnections(MyNetwork::Selector*& selector, MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Listener*& listener) {
+void ManageConnections(MyNetwork::Selector*& selector, MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Listener*& listener, Game*& game) {
 	MyNetwork::Status status;
 
 	bool returnMenu = false;
@@ -135,7 +135,7 @@ void ManageConnections(MyNetwork::Selector*& selector, MyNetwork::Socket*& sockT
 					//be notified when he sends something
 					selector->Add(connection);
 
-					
+
 					//TODO GESTION DE LISTENER CON SALA COMPLETA
 				}
 				else {
@@ -166,13 +166,13 @@ void ManageConnections(MyNetwork::Selector*& selector, MyNetwork::Socket*& sockT
 					std::cout << "He recibido ROOMS\n";
 					returnMenu = SelectRoom(ims, sockToBss);
 					break;
-				case ACKJOIN:
-					std::cout << "He recibido ACKJOIN\n";
-					returnMenu = !AcknowledgeJoin(ims, sockToBss, connections, selector, listener);
-					break;
 				case ACKCREATE:
 					std::cout << "He recibido ACKCREATE\n";
-					returnMenu = !AcknowledgeCreate(ims, sockToBss, listener, selector, connections);
+					returnMenu = !AcknowledgeCreate(ims, sockToBss, listener, selector, connections, game);
+					break;
+				case ACKJOIN:
+					std::cout << "He recibido ACKJOIN\n";
+					returnMenu = !AcknowledgeJoin(ims, sockToBss, connections, selector, listener, game);
 					break;
 				case CHAT:
 					std::cout << "Ha entrado en el chat que no toca\n";
@@ -223,10 +223,12 @@ void ManageConnections(MyNetwork::Selector*& selector, MyNetwork::Socket*& sockT
 	}
 }
 
-bool AcknowledgeCreate(InputMemoryStream*& ims, MyNetwork::Socket*& sock, MyNetwork::Listener*& listener, MyNetwork::Selector*& selector, std::vector<MyNetwork::Socket*>*& connections) {
-	
+bool AcknowledgeCreate(InputMemoryStream*& ims, MyNetwork::Socket*& sock, MyNetwork::Listener*& listener, MyNetwork::Selector*& selector, std::vector<MyNetwork::Socket*>*& connections, Game*& game) {
+
 	bool ackCreate;
 	ims->Read(&ackCreate);
+	int maxPlayers;
+	ims->Read(&maxPlayers);
 	if (ackCreate) {
 		std::cout << "Puedo crear una sala\n";
 
@@ -244,6 +246,9 @@ bool AcknowledgeCreate(InputMemoryStream*& ims, MyNetwork::Socket*& sock, MyNetw
 		//abro el chat
 		std::thread tMessage(SendMessage, connections);
 		tMessage.detach();
+		game = new Game();
+		game->currentPlayers = 1;
+		game->maxPlayers = maxPlayers;
 	}
 	else std::cout << "No puedo crear una sala\n";
 
@@ -324,17 +329,20 @@ bool SelectRoom(InputMemoryStream*& ims, MyNetwork::Socket*& _sock) {
 	}
 }
 
-bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Selector*& selector, MyNetwork::Listener*& listener) {
+bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std::vector<MyNetwork::Socket*>*& connections, MyNetwork::Selector*& selector, MyNetwork::Listener*& listener, Game*& game) {
 	//Si recibo -1 es que no he conseguido entrar en la partida (contraseña/sala llena)
 	int numPlayers;
 	ims->Read(&numPlayers);
+
+	int maxPlayers;
+	ims->Read(&maxPlayers);
 
 	if (numPlayers == -1) {
 		std::cout << "No has podido unirte a la partida." << std::endl;
 		return false;
 	}
 	std::cout << "Password correcta!!" << std::endl;
-	
+
 	//establecemos conexion con los demas clientes de la sala
 	for (int i = 0; i < numPlayers; i++)
 	{
@@ -366,14 +374,23 @@ bool AcknowledgeJoin(InputMemoryStream*& ims, MyNetwork::Socket*& sockToBss, std
 	sockToBss = nullptr;
 	std::cout << "Elimino el socket conectado al server BSS cuando entro en una partida\n";
 
+	//Sumamos uno que seríamos nosotros
+	numPlayers++;
+
 	//TODO GESTION DEL LISTENER CUANDO LA SALA ESTA LLENA
-
-
-	//Empiezo a escuchar por el puerto del sock descontado (listener)
-	listener->Listen(listenerPort);
-	//añado listener al selector
-	selector->Add(listener);
-	std::cout << "Empiezo a escuchar por el puerto " << listenerPort << std::endl;
+	if (numPlayers == maxPlayers) {
+		game = new Game();
+		game->currentPlayers = numPlayers ;
+		game->maxPlayers = maxPlayers;
+		std::cout << "No abro el listener porque ya estamos todos" << std::endl;
+	}
+	else {
+		//Empiezo a escuchar por el puerto del sock descontado (listener)
+		listener->Listen(listenerPort);
+		//añado listener al selector
+		selector->Add(listener);
+		std::cout << "Empiezo a escuchar por el puerto " << listenerPort << std::endl;
+	}
 
 	//abro el chat
 	std::thread tMessage(SendMessage, connections);
@@ -459,7 +476,7 @@ void CreateRoom(MyNetwork::Socket*& sock, std::vector<MyNetwork::Socket*>*& conn
 void SearchForRoom(MyNetwork::Socket*& sock) {
 
 	OutputMemoryStream oms;
-	
+
 	oms.Write((int)Header::SHOW);
 
 	std::cout << "Filtrar partidas? Y/N" << std::endl;
