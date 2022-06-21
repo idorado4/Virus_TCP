@@ -18,5 +18,8 @@
     <ClCompile Include="BSS.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="NewBSS.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

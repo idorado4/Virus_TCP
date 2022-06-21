@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BSS.cpp" />
+    <ClCompile Include="NewBSS.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{F879348A-59B4-4582-A78C-00A6EA9E2F33}</ProjectGuid>
