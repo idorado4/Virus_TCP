@@ -69,9 +69,9 @@ bool AcknowledgeJoin(InputMemoryStream* ims);
 bool AcknowledgeCreate(InputMemoryStream* ims);
 
 
-MyNetwork::Socket* sockToServer;
-MyNetwork::Selector* selector;
-MyNetwork::Listener* listener;
+MyNetwork::Socket sockToServer;
+MyNetwork::Selector selector;
+MyNetwork::Listener listener;
 
 std::vector<MyNetwork::Socket*> socksToClients;
 
@@ -85,9 +85,8 @@ int main() {
 	end = false;
 	std::cout << "Conectando al servidor" << std::endl;
 
-	sockToServer = new MyNetwork::Socket();
 	//conecta con BSS
-	MyNetwork::Status status = sockToServer->Connect("localhost", 50000);
+	MyNetwork::Status status = sockToServer.Connect("localhost", 50000);
 	if (status == MyNetwork::Status::DONE) {
 		std::cout << "¡Conexion con el servidor establecida!" << std::endl;
 		std::cout << std::endl;
@@ -98,13 +97,11 @@ int main() {
 		std::cin >> temp;
 	}
 
-	std::cout << sockToServer->GetLocalPort() << std::endl;
+	std::cout << sockToServer.GetLocalPort() << std::endl;
 
 
-	selector = new MyNetwork::Selector();
-	selector->Add(sockToServer);
+	selector.Add(&sockToServer);
 
-	listener = new MyNetwork::Listener();
 
 
 	while (!end)
@@ -205,7 +202,7 @@ void CreateRoom()
 		}
 	}
 
-	MyNetwork::Status status = sockToServer->Send(&oms);
+	MyNetwork::Status status = sockToServer.Send(&oms);
 	if (status != MyNetwork::Status::DONE)
 		std::cout << "Error al enviar la informacion de crear la nueva sala" << std::endl;
 	else std::cout << "MENSAJE ENVIADO" << std::endl;
@@ -298,7 +295,7 @@ void SearchForRoom()
 	}
 
 	std::cout << "Envio los filtros al server\n";
-	sockToServer->Send(&oms);
+	sockToServer.Send(&oms);
 
 }
 
@@ -312,17 +309,16 @@ void ManageServerCommands()
 
 	while (!endManagement)
 	{
-		if (selector->Wait()) {
+		if (selector.Wait()) {
 
-			if (selector->IsReady(sockToServer)) {
+			if (selector.IsReady(&sockToServer)) {
 				InputMemoryStream* ims;
 				char buffer[1000];
 				size_t br = 0;
-				status = sockToServer->Receive(&ims, buffer, 1000, br);
+				status = sockToServer.Receive(&ims, buffer, 1000, br);
 				if (status != MyNetwork::Status::DONE) {
-					selector->Remove(sockToServer);
-					sockToServer->Disconnect();
-					delete sockToServer;
+					selector.Remove(&sockToServer);
+					sockToServer.Disconnect();
 					std::cout << "Elimino el socket (al BSS) que se ha desconectado\n";
 					endManagement = true;
 					break;
@@ -367,12 +363,12 @@ void WaitForOtherPlayers()
 	while (!endWait)
 	{
 		std::cout << "WAIT FOR MORE PLAYERS" << std::endl;
-		if (selector->Wait())
+		if (selector.Wait())
 		{
-			if (selector->IsReady(listener))
+			if (selector.IsReady(&listener))
 			{
 				MyNetwork::Socket* newClientConnected = new MyNetwork::Socket();
-				if (listener->Accept(newClientConnected) == MyNetwork::Status::DONE) {
+				if (listener.Accept(newClientConnected) == MyNetwork::Status::DONE) {
 
 					std::cout << "Se ha establecido conexion con un nuevo cliente" << std::endl;
 					std::cout << "PORT DEL NUEVO" << newClientConnected->GetRemotePort() << std::endl;
@@ -380,7 +376,7 @@ void WaitForOtherPlayers()
 					socksToClients.push_back(std::move(newClientConnected));
 
 					//Add the new client to the selector so that we will be notified when he sends something
-					selector->Add(std::move(newClientConnected));
+					selector.Add(std::move(newClientConnected));
 					std::cout << "Game players " << game.currentPlayers << "/" << game.maxPlayers << std::endl;
 
 					game.currentPlayers++;
@@ -390,9 +386,7 @@ void WaitForOtherPlayers()
 						std::cout << "Ya estamos todos!! ^^ " << std::endl;
 						std::thread tChat(CheckCommand);
 						tChat.detach();
-						selector->Remove(listener);
-						delete listener;
-						listener = nullptr;
+						selector.Remove(&listener);
 						/*Shuffle(game);
 						Deal(game);*/
 						return;
@@ -418,19 +412,19 @@ void ManageConnectedClients()
 	while (!endManagement)
 	{
 		// Make the selector wait for data on any socket
-		if (selector->Wait())
+		if (selector.Wait())
 		{
 			for (size_t i = 0; i < socksToClients.size(); i++) {
 
 				MyNetwork::Socket* connection = socksToClients.at(i);
 
-				if (selector->IsReady(connection)) {
+				if (selector.IsReady(connection)) {
 					InputMemoryStream* ims;
 					char buffer[1000];
 					size_t br = 0;
 					status = connection->Receive(&ims, buffer, 1000, br);
 					if (status != MyNetwork::Status::DONE) {
-						selector->Remove(connection);
+						selector.Remove(connection);
 						socksToClients.erase(socksToClients.begin() + i);
 						connection->Disconnect();
 						delete connection;
@@ -526,7 +520,7 @@ bool SelectRoom(InputMemoryStream* ims)
 		oms.Write(headerType);
 		oms.WriteString(selectedRoom.name);
 		oms.WriteString(tempString);
-		sockToServer->Send(&oms);
+		sockToServer.Send(&oms);
 		return false;
 	}
 	else {
@@ -583,7 +577,7 @@ bool AcknowledgeJoin(InputMemoryStream* ims)
 
 		}
 		socksToClients.push_back(std::move(newClient));
-		selector->Add(std::move(newClient));
+		selector.Add(std::move(newClient));
 
 		Player newPlayer;
 		newPlayer.ID = IDReceived;
@@ -605,12 +599,9 @@ bool AcknowledgeJoin(InputMemoryStream* ims)
 	}
 
 	//Me guardo el puerto del socket porqe ponemos a escuchar al listener por este
-	unsigned short listenerPort = sockToServer->GetLocalPort();
+	unsigned short listenerPort = sockToServer.GetLocalPort();
 	//Me desconecto del server
-	sockToServer->Disconnect();
-	//libero memoria
-	delete sockToServer;
-	sockToServer = nullptr;
+	sockToServer.Disconnect();
 	std::cout << "Elimino el socket conectado al server BSS cuando entro en una partida\n";
 
 	//Sumamos uno que seríamos nosotros
@@ -624,15 +615,13 @@ bool AcknowledgeJoin(InputMemoryStream* ims)
 		std::cout << "No abro el listener porque ya estamos todos" << std::endl;
 		std::thread tChat(CheckCommand);
 		tChat.detach();
-		delete listener;
-		listener = nullptr;
 		hasToListen = false;
 	}
 	else {
 		//Empiezo a escuchar por el puerto del sock descontado (listener)
-		listener->Listen(listenerPort);
+		listener.Listen(listenerPort);
 		//añado listener al selector
-		selector->Add(listener);
+		selector.Add(&listener);
 		hasToListen = true;
 		std::cout << "Empiezo a escuchar por el puerto " << listenerPort << std::endl;
 
@@ -657,22 +646,20 @@ bool AcknowledgeCreate(InputMemoryStream* ims)
 	int maxPlayers;
 	ims->Read(&maxPlayers);
 
-	game.seed = sockToServer->GetLocalPort();
+	game.seed = sockToServer.GetLocalPort();
 	std::cout << std::endl;
 	std::cout << "SEED: " << game.seed << std::endl;
 	std::cout << std::endl;
 
 
-	unsigned short listenerPort = sockToServer->GetLocalPort();
-	sockToServer->Disconnect();
-	delete sockToServer;
-	sockToServer = nullptr;
+	unsigned short listenerPort = sockToServer.GetLocalPort();
+	sockToServer.Disconnect();
 	std::cout << "Elimino el socket conectado al server BSS al crear una partida\n";
 
 	//Empiezo a escuchar por el puerto del sock descontado (listener)
-	listener->Listen(listenerPort);
+	listener.Listen(listenerPort);
 	//añado listener al selector
-	selector->Add(listener);
+	selector.Add(&listener);
 	hasToListen = true;
 
 
