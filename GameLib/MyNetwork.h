@@ -19,7 +19,7 @@ public:
 	public:
 		Listener();
 		~Listener();
-		MyNetwork::Status Listen(uint16_t PORT);
+		MyNetwork::Status Listen(unsigned short PORT);
 		sf::TcpListener* Get();
 		MyNetwork::Status Accept(Socket* _socket);
 
@@ -33,7 +33,7 @@ public:
 		Socket();
 		~Socket();
 
-		MyNetwork::Status Connect(std::string IP, uint16_t PORT);
+		MyNetwork::Status Connect(std::string IP, unsigned short PORT);
 		sf::TcpSocket* Get();
 		MyNetwork::Status Send(OutputMemoryStream* oms);
 		InputMemoryStream* Receive(char buffer[], int bufferSize, size_t br);

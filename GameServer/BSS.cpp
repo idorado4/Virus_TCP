@@ -15,10 +15,10 @@ enum Header { CREATE = 0, SHOW, ROOMS, SELECTEDROOM, ACKJOIN, CHAT, ACKCREATE };
 struct Peer
 {
 	std::string IP;
-	uint16_t PORT; //Unsigned Short
+	unsigned short PORT; //Unsigned Short
 	int ID;
 
-	Peer(std::string _ip, uint16_t _port, int _id) {
+	Peer(std::string _ip, unsigned short _port, int _id) {
 		IP = _ip;
 		PORT = _port;
 		ID = _id;
@@ -38,10 +38,18 @@ struct Room
 };
 
 void Manager();
-void ShowFilteredRooms(MyNetwork::Socket* client, std::vector<Room>& rooms, int maxPlayers, bool hasPassword);
-void ShowAllRooms(MyNetwork::Socket* client, std::vector<Room>& rooms);
-void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwork::Socket* client);
-void AcknowledgeCreate(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwork::Socket* client, MyNetwork::Selector& selector, std::vector<MyNetwork::Socket*>& clientes);
+void ShowFilteredRooms(MyNetwork::Socket* client, int maxPlayers, bool hasPassword);
+void ShowAllRooms(MyNetwork::Socket* client);
+void JoinSelectedRoom(InputMemoryStream& ims, MyNetwork::Socket* client);
+void AcknowledgeCreate(InputMemoryStream* ims, MyNetwork::Socket* client);
+
+std::vector<Room> rooms;
+std::vector<MyNetwork::Socket*> clients;
+
+MyNetwork::Listener listener;
+MyNetwork::Selector selector;
+
+
 
 int main() {
 
@@ -68,8 +76,6 @@ int main() {
 void Manager() {
 
 
-	MyNetwork::Listener listener;
-
 	MyNetwork::Status status = listener.Listen(50000);
 	if (status != MyNetwork::Status::DONE) {
 		std::cout << "Error al escuchar por el puerto 50000" << std::endl;
@@ -79,13 +85,8 @@ void Manager() {
 	}
 	std::cout << "Escuchando por el puerto 50000" << std::endl;
 
-
-	MyNetwork::Selector selector;
 	selector.Add(&listener);
 
-	//la gente que busca como la que crea
-	std::vector<MyNetwork::Socket*> clientes;
-	std::vector<Room> rooms;
 
 	while (true) {
 		if (selector.Wait()) {
@@ -94,10 +95,10 @@ void Manager() {
 				if (listener.Accept(sock) == MyNetwork::Status::DONE) {
 					std::cout << "Se ha establecido conexion!" << std::endl;
 
-					clientes.push_back(std::move(sock));
+					clients.push_back(std::move(sock));
 					//Add the new client to the selector so that we will
 					//be notified when he sends something
-					selector.Add(sock);
+					selector.Add(std::move(sock));
 
 				}
 				else {
@@ -106,10 +107,10 @@ void Manager() {
 			}
 			else {
 				//recorre todos los sockets ya conectados
-				for (size_t i = 0; i < clientes.size(); i++)
+				for (size_t i = 0; i < clients.size(); i++)
 				{
 					//guardamos direccion del socket que estoy recorriendo
-					MyNetwork::Socket* client = clientes.at(i);
+					MyNetwork::Socket* client = clients.at(i);
 					//miro si es este el socket reacciona
 					if (selector.IsReady(client)) {
 
@@ -120,7 +121,7 @@ void Manager() {
 						status = client->Receive(&ims, buffer, 1000, br);
 						if (status != MyNetwork::Status::DONE) {
 							selector.Remove(client);
-							clientes.erase(clientes.begin() + i);
+							clients.erase(clients.begin() + i);
 							client->Disconnect();
 							delete client;
 							std::cout << "Elimino el socket que se ha desconectado (Status!=DONE cuando recivo headers)\n";
@@ -136,7 +137,7 @@ void Manager() {
 						switch (header)
 						{
 						case CREATE:
-							AcknowledgeCreate(*ims, rooms, client, selector, clientes);
+							AcknowledgeCreate(ims, client);
 
 							break;
 						case SHOW:
@@ -152,17 +153,17 @@ void Manager() {
 								bool passwordFilter;
 								ims->Read(&passwordFilter);
 								//Enviamos los filtros
-								ShowFilteredRooms(client, rooms, maxPlayers, passwordFilter);
+								ShowFilteredRooms(client, maxPlayers, passwordFilter);
 							}
 							else {
 								std::cout << "el cliente quiere todas las partidas " << std::endl;
-								ShowAllRooms(client, rooms);
+								ShowAllRooms(client);
 							}
 							break;
 
 						case SELECTEDROOM:
 							std::cout << "Ha seleccionado una sala\n";
-							JoinSelectedRoom(*ims, rooms, client);
+							JoinSelectedRoom(*ims, client);
 
 
 
@@ -181,15 +182,15 @@ void Manager() {
 	}
 }
 
-void AcknowledgeCreate(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwork::Socket* client, MyNetwork::Selector& selector, std::vector<MyNetwork::Socket*>& clientes) {
+void AcknowledgeCreate(InputMemoryStream* ims, MyNetwork::Socket* client) {
 
 	//Miro si se puede crear y retorno ACKCREATE
 	std::cout << "el cliente quiere crear partida" << std::endl;
 	Room newRoom;
 	//Creamos una nueva sala con la informacion recibida
-	newRoom.name = ims.ReadString();
-	newRoom.password = ims.ReadString();
-	ims.Read(&newRoom.maxPlayers);
+	newRoom.name = ims->ReadString();
+	newRoom.password = ims->ReadString();
+	ims->Read(&newRoom.maxPlayers);
 
 	OutputMemoryStream oms;
 
@@ -211,12 +212,14 @@ void AcknowledgeCreate(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwo
 	newRoom.seed = (int)client->GetRemotePort();
 
 
-
 	client->Send(&oms);
 
 	newRoom.currentPlayers = 1;
 	newRoom.clients.push_back({ client->GetRemoteAdress(), client->GetRemotePort(), 1 });
 
+
+
+	std::cout << "EL CLIENTE -> IP: " << client->GetRemoteAdress() << "PORT: " << client->GetRemotePort() << " CREA LA SALA" << std::endl;
 	std::cout << "Nombre sala:" << newRoom.name << std::endl;
 	std::cout << "Contraseña: -" << newRoom.password << "-" << std::endl;
 	std::cout << "maxplayers: " << newRoom.maxPlayers << std::endl;
@@ -228,11 +231,11 @@ void AcknowledgeCreate(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwo
 
 	//Gestionar desconexión del cliente 
 	selector.Remove(client);
-	for (int i = 0; i < clientes.size(); i++)
+	for (int i = 0; i < clients.size(); i++)
 	{
-		MyNetwork::Socket* tempSock = clientes.at(i);
+		MyNetwork::Socket* tempSock = clients.at(i);
 		if (tempSock == client) {
-			clientes.erase(clientes.begin() + i);
+			clients.erase(clients.begin() + i);
 			client->Disconnect();
 			delete client;
 			std::cout << "Elimino el socket que se ha desconectado (Cuando creo una sala)\n";
@@ -241,7 +244,7 @@ void AcknowledgeCreate(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwo
 	}
 }
 
-void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwork::Socket* client) {
+void JoinSelectedRoom(InputMemoryStream& ims, MyNetwork::Socket* client) {
 
 	std::string nameRoom = ims.ReadString();
 	std::string password = ims.ReadString();
@@ -305,7 +308,7 @@ void JoinSelectedRoom(InputMemoryStream& ims, std::vector<Room>& rooms, MyNetwor
 
 }
 
-void ShowFilteredRooms(MyNetwork::Socket* client, std::vector<Room>& rooms, int maxPlayers, bool passwordFilter) {
+void ShowFilteredRooms(MyNetwork::Socket* client, int maxPlayers, bool passwordFilter) {
 
 	OutputMemoryStream oms;
 	oms.Write((int)Header::ROOMS);
@@ -316,7 +319,6 @@ void ShowFilteredRooms(MyNetwork::Socket* client, std::vector<Room>& rooms, int 
 	std::cout << "Busco salas con " << maxPlayers << " y con pass " << passwordFilter << std::endl;
 
 	int numRooms = 0;
-
 
 	for (int i = 0; i < rooms.size(); i++)
 	{
@@ -413,7 +415,9 @@ void ShowFilteredRooms(MyNetwork::Socket* client, std::vector<Room>& rooms, int 
 	client->Send(&oms);
 }
 
-void ShowAllRooms(MyNetwork::Socket* client, std::vector<Room>& rooms) {
+void ShowAllRooms(MyNetwork::Socket* client) {
+	//enviar el numero completo de rooms
+	//recorrer el vector enviando la informacion sala por sala
 	OutputMemoryStream oms;
 	oms.Write((int)Header::ROOMS);
 	int numRooms = rooms.size();
@@ -431,8 +435,6 @@ void ShowAllRooms(MyNetwork::Socket* client, std::vector<Room>& rooms) {
 	}
 
 	client->Send(&oms);
-	//enviar el numero completo de rooms
-	//recorrer el vector enviando la informacion sala por sala
 }
 
 

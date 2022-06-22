@@ -20,7 +20,7 @@ MyNetwork::Listener::~Listener()
 	myListener = nullptr;
 }
 
-MyNetwork::Status MyNetwork::Listener::Listen(uint16_t PORT)
+MyNetwork::Status MyNetwork::Listener::Listen(unsigned short PORT)
 {
 	return (MyNetwork::Status)myListener->listen(PORT);
 }
@@ -48,7 +48,7 @@ MyNetwork::Socket::~Socket()
 	delete mySocket;
 	mySocket = nullptr;
 }
-MyNetwork::Status MyNetwork::Socket::Connect(std::string IP, uint16_t PORT)
+MyNetwork::Status MyNetwork::Socket::Connect(std::string IP, unsigned short PORT)
 {
 	return (MyNetwork::Status)mySocket->connect(IP, PORT);
 }

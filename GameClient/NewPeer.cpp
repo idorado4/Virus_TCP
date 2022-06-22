@@ -20,7 +20,7 @@ struct Card {
 
 struct Peer {
 	std::string IP;
-	uint16_t PORT;
+	unsigned short PORT;
 };
 
 struct Player {
@@ -105,7 +105,6 @@ int main() {
 	selector->Add(sockToServer);
 
 	listener = new MyNetwork::Listener();
-	selector->Add(listener);
 
 
 	while (!end)
@@ -357,7 +356,7 @@ void ManageServerCommands()
 
 void WaitForOtherPlayers()
 {
-	std::cout << "WAIT FOR OTHER PALYERS" << std::endl;
+	std::cout << "WAIT FOR OTHER PLAYERS" << std::endl;
 	if (end) return;
 	if (!hasToListen) return;
 
@@ -367,6 +366,7 @@ void WaitForOtherPlayers()
 
 	while (!endWait)
 	{
+		std::cout << "WAIT FOR MORE PLAYERS" << std::endl;
 		if (selector->Wait())
 		{
 			if (selector->IsReady(listener))
@@ -375,6 +375,7 @@ void WaitForOtherPlayers()
 				if (listener->Accept(newClientConnected) == MyNetwork::Status::DONE) {
 
 					std::cout << "Se ha establecido conexion con un nuevo cliente" << std::endl;
+					std::cout << "PORT DEL NUEVO" << newClientConnected->GetRemotePort() << std::endl;
 
 					socksToClients.push_back(std::move(newClientConnected));
 
@@ -564,7 +565,7 @@ bool AcknowledgeJoin(InputMemoryStream* ims)
 		std::string IPReceived;
 		IPReceived = ims->ReadString();
 
-		uint16_t portReceived;
+		unsigned short portReceived;
 		ims->Read(&portReceived);
 
 		int IDReceived;
@@ -604,7 +605,7 @@ bool AcknowledgeJoin(InputMemoryStream* ims)
 	}
 
 	//Me guardo el puerto del socket porqe ponemos a escuchar al listener por este
-	uint16_t listenerPort = sockToServer->GetLocalPort();
+	unsigned short listenerPort = sockToServer->GetLocalPort();
 	//Me desconecto del server
 	sockToServer->Disconnect();
 	//libero memoria
@@ -631,7 +632,7 @@ bool AcknowledgeJoin(InputMemoryStream* ims)
 		//Empiezo a escuchar por el puerto del sock descontado (listener)
 		listener->Listen(listenerPort);
 		//añado listener al selector
-		//selector->Add(listener);
+		selector->Add(listener);
 		hasToListen = true;
 		std::cout << "Empiezo a escuchar por el puerto " << listenerPort << std::endl;
 
@@ -662,7 +663,7 @@ bool AcknowledgeCreate(InputMemoryStream* ims)
 	std::cout << std::endl;
 
 
-	uint16_t listenerPort = sockToServer->GetLocalPort();
+	unsigned short listenerPort = sockToServer->GetLocalPort();
 	sockToServer->Disconnect();
 	delete sockToServer;
 	sockToServer = nullptr;
@@ -671,7 +672,7 @@ bool AcknowledgeCreate(InputMemoryStream* ims)
 	//Empiezo a escuchar por el puerto del sock descontado (listener)
 	listener->Listen(listenerPort);
 	//añado listener al selector
-	//selector->Add(listener);
+	selector->Add(listener);
 	hasToListen = true;
 
 
@@ -700,7 +701,8 @@ void CheckCommand() {
 				std::cout << "Clientes: " << socksToClients.size() << std::endl;
 				for (int i = 0; i < socksToClients.size(); i++)
 				{
-					std::cout << "client PORT: " << socksToClients[i]->GetLocalPort() << std::endl;
+					std::cout << "HIS PORT: " << socksToClients[i]->GetRemotePort() << std::endl;
+					std::cout << "MY PORT: " << socksToClients[i]->GetLocalPort() << std::endl;
 
 					OutputMemoryStream oms;
 					oms.Write(CHAT);
