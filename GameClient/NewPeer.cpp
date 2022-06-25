@@ -317,8 +317,8 @@ void ManageServerCommands()
 				size_t br = 0;
 				status = sockToServer.Receive(&ims, buffer, 1000, br);
 				if (status != MyNetwork::Status::DONE) {
-					selector.Remove(&sockToServer);
 					sockToServer.Disconnect();
+					selector.Remove(&sockToServer);
 					std::cout << "Elimino el socket (al BSS) que se ha desconectado\n";
 					endManagement = true;
 					break;
@@ -376,7 +376,7 @@ void WaitForOtherPlayers()
 					socksToClients.push_back(std::move(newClientConnected));
 
 					//Add the new client to the selector so that we will be notified when he sends something
-					selector.Add(std::move(newClientConnected));
+					selector.Add(newClientConnected);
 					std::cout << "Game players " << game.currentPlayers << "/" << game.maxPlayers << std::endl;
 
 					game.currentPlayers++;
@@ -577,7 +577,7 @@ bool AcknowledgeJoin(InputMemoryStream* ims)
 
 		}
 		socksToClients.push_back(std::move(newClient));
-		selector.Add(std::move(newClient));
+		selector.Add(newClient);
 
 		Player newPlayer;
 		newPlayer.ID = IDReceived;
@@ -601,6 +601,7 @@ bool AcknowledgeJoin(InputMemoryStream* ims)
 	//Me guardo el puerto del socket porqe ponemos a escuchar al listener por este
 	unsigned short listenerPort = sockToServer.GetLocalPort();
 	//Me desconecto del server
+	selector.Remove(&sockToServer);
 	sockToServer.Disconnect();
 	std::cout << "Elimino el socket conectado al server BSS cuando entro en una partida\n";
 
@@ -653,6 +654,7 @@ bool AcknowledgeCreate(InputMemoryStream* ims)
 
 
 	unsigned short listenerPort = sockToServer.GetLocalPort();
+	selector.Remove(&sockToServer);
 	sockToServer.Disconnect();
 	std::cout << "Elimino el socket conectado al server BSS al crear una partida\n";
 
