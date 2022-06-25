@@ -27,9 +27,15 @@
     <ClInclude Include="OutputMemoryStream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ConsoleControl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="MyNetwork.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ConsoleControl.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

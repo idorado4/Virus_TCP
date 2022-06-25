@@ -32,6 +32,7 @@ struct Room
 	int maxPlayers;
 	int currentPlayers;
 	int seed;
+
 	//Los clientes conectados
 	std::vector<Peer> clients;
 
@@ -164,10 +165,6 @@ void Manager() {
 						case SELECTEDROOM:
 							std::cout << "Ha seleccionado una sala\n";
 							JoinSelectedRoom(*ims, client);
-
-
-
-
 							break;
 
 						default:
@@ -183,7 +180,7 @@ void Manager() {
 }
 
 void AcknowledgeCreate(InputMemoryStream* ims, MyNetwork::Socket* client) {
-
+	MyNetwork::Status status;
 	//Miro si se puede crear y retorno ACKCREATE
 	std::cout << "el cliente quiere crear partida" << std::endl;
 	Room newRoom;
@@ -201,7 +198,13 @@ void AcknowledgeCreate(InputMemoryStream* ims, MyNetwork::Socket* client) {
 		if (newRoom.name == rooms[i].name) {
 			std::cout << "No se puede crear la sala porque ya existe el nombre" << std::endl;
 			oms.Write(false);
-			client->Send(&oms);
+			
+			status = client->Send(&oms);
+			if (status != MyNetwork::Status::DONE) {
+			std::cout << "No se ha podido enviar el paquete de ACKCREATE" << std::endl;
+
+			}
+
 			return;
 		}
 	}
@@ -212,7 +215,11 @@ void AcknowledgeCreate(InputMemoryStream* ims, MyNetwork::Socket* client) {
 	newRoom.seed = (int)client->GetRemotePort();
 
 
-	client->Send(&oms);
+	status = client->Send(&oms);
+	if (status != MyNetwork::Status::DONE) {
+		std::cout << "No se ha podido enviar el paquete de ACKCREATE" << std::endl;
+
+	}
 
 	newRoom.currentPlayers = 1;
 	newRoom.clients.push_back({ client->GetRemoteAdress(), client->GetRemotePort(), 1 });
@@ -412,7 +419,10 @@ void ShowFilteredRooms(MyNetwork::Socket* client, int maxPlayers, bool passwordF
 
 	}
 
-	client->Send(&oms);
+	MyNetwork::Status status = client->Send(&oms);
+	if (status != MyNetwork::Status::DONE) {
+		std::cout << "No se ha podido enviar las salas al cliente\n";
+	}
 }
 
 void ShowAllRooms(MyNetwork::Socket* client) {
@@ -434,7 +444,10 @@ void ShowAllRooms(MyNetwork::Socket* client) {
 		oms.Write(maxPlayers);
 	}
 
-	client->Send(&oms);
+	MyNetwork::Status status = client->Send(&oms);
+	if (status != MyNetwork::Status::DONE) {
+		std::cout << "No se ha podido enviar las salas al cliente\n";
+	}
 }
 
 

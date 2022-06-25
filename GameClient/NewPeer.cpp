@@ -4,6 +4,7 @@
 #include <MyNetwork.h>
 #include <InputMemoryStream.h>
 #include <OutputMemoryStream.h>
+#include <ConsoleControl.h>
 
 #include <future>
 
@@ -24,10 +25,11 @@ struct Peer {
 };
 
 struct Player {
-	Card* hand[3];
+	std::vector<Card> hand;
 	bool turn;
-	std::vector<Card*> table;
+	std::vector<Card> table;
 	int ID;
+	bool isReady = false;
 };
 
 //Se usa para la gestión de salas
@@ -46,8 +48,8 @@ struct Game {
 	int seed;
 	//Informacion de la partida
 	int localId;
-	std::vector<Card*>* deck;
-	std::vector<Card*> discardPile; // = new std::vector<Card*>;
+	std::vector<Card> deck;
+	std::vector<Card> discardPile; // = new std::vector<Card*>;
 	std::vector<Player> players;
 };
 
@@ -68,6 +70,12 @@ bool SelectRoom(InputMemoryStream* ims);
 bool AcknowledgeJoin(InputMemoryStream* ims);
 bool AcknowledgeCreate(InputMemoryStream* ims);
 
+void Shuffle();
+void Deal();
+void SetInitialTurn();
+std::string CardToString(Card card);
+
+void GameManager();
 
 MyNetwork::Socket sockToServer;
 MyNetwork::Selector selector;
@@ -79,10 +87,13 @@ Game game;
 
 bool end;
 bool hasToListen;
+bool endChatThread;
 
+int currentTurnNumber;
 
 int main() {
 	end = false;
+	currentTurnNumber = 0;
 	std::cout << "Conectando al servidor" << std::endl;
 
 	//conecta con BSS
@@ -109,7 +120,9 @@ int main() {
 		CreateOrSearchRoom();
 		ManageServerCommands();
 		WaitForOtherPlayers();
-		ManageConnectedClients();
+		std::thread tManageConnectedClients(ManageConnectedClients);
+		tManageConnectedClients.detach();
+		GameManager();
 	}
 
 	return 0;
@@ -295,7 +308,10 @@ void SearchForRoom()
 	}
 
 	std::cout << "Envio los filtros al server\n";
-	sockToServer.Send(&oms);
+	MyNetwork::Status status = sockToServer.Send(&oms);
+	if (status != MyNetwork::Status::DONE) {
+		std::cout << "No se envió el paquete para buscar sala\n";
+	}
 
 }
 
@@ -377,9 +393,12 @@ void WaitForOtherPlayers()
 
 					//Add the new client to the selector so that we will be notified when he sends something
 					selector.Add(newClientConnected);
+					game.currentPlayers++;
+					Player newPlayer;
+					newPlayer.ID = game.currentPlayers;
+					game.players.push_back(newPlayer);
 					std::cout << "Game players " << game.currentPlayers << "/" << game.maxPlayers << std::endl;
 
-					game.currentPlayers++;
 					//TODO GESTION DE LISTENER CON SALA COMPLETA
 					if (game.currentPlayers == game.maxPlayers) {
 
@@ -387,8 +406,8 @@ void WaitForOtherPlayers()
 						std::thread tChat(CheckCommand);
 						tChat.detach();
 						selector.Remove(&listener);
-						/*Shuffle(game);
-						Deal(game);*/
+						Shuffle();
+						Deal();
 						return;
 					}
 				}
@@ -436,18 +455,28 @@ void ManageConnectedClients()
 
 					int header;
 					ims->Read(&header);
-
+					std::string msg;
 					switch (header)
 					{
 					case CHAT:
 						std::cout << "He recibido CHAT\n";
-						std::cout << "CHAT: " << ims->ReadString() << std::endl;
+						msg = ims->ReadString();
+						std::cout << "CHAT: " << msg << std::endl;
+						if (msg == "ready") {
+							std::cout << "ALGUIEN HA MANDADO READY" << std::endl;
+							int idPlayerReady = -1;
+							ims->Read(&idPlayerReady);
+							for (size_t i = 0; i < game.players.size(); i++)
+							{
+								if (game.players[i].ID == idPlayerReady)
+									game.players[i].isReady = true;
+							}
+						}
 						break;
 					default:
 						break;
 					}
 				}
-
 			}
 		}
 	}
@@ -520,7 +549,10 @@ bool SelectRoom(InputMemoryStream* ims)
 		oms.Write(headerType);
 		oms.WriteString(selectedRoom.name);
 		oms.WriteString(tempString);
-		sockToServer.Send(&oms);
+		MyNetwork::Status status = sockToServer.Send(&oms);
+		if (status != MyNetwork::Status::DONE) {
+			std::cout << "No se ha enviado el paquete de selección de sala\n";
+		}
 		return false;
 	}
 	else {
@@ -597,6 +629,7 @@ bool AcknowledgeJoin(InputMemoryStream* ims)
 	{
 		std::cout << "Player " << game.players[i].ID << std::endl;
 	}
+	std::cout << "LOCAL Player ID" << game.localId << std::endl;
 
 	//Me guardo el puerto del socket porqe ponemos a escuchar al listener por este
 	unsigned short listenerPort = sockToServer.GetLocalPort();
@@ -614,13 +647,18 @@ bool AcknowledgeJoin(InputMemoryStream* ims)
 	if (numPlayers == maxPlayers) {
 
 		std::cout << "No abro el listener porque ya estamos todos" << std::endl;
+		Shuffle();
+		Deal();
 		std::thread tChat(CheckCommand);
 		tChat.detach();
 		hasToListen = false;
 	}
 	else {
 		//Empiezo a escuchar por el puerto del sock descontado (listener)
-		listener.Listen(listenerPort);
+		MyNetwork::Status status = listener.Listen(listenerPort);
+		if (status != MyNetwork::Status::DONE) {
+			std::cout << "No se ha podido escuchar por este puerto" << std::endl;
+		}
 		//añado listener al selector
 		selector.Add(&listener);
 		hasToListen = true;
@@ -659,7 +697,12 @@ bool AcknowledgeCreate(InputMemoryStream* ims)
 	std::cout << "Elimino el socket conectado al server BSS al crear una partida\n";
 
 	//Empiezo a escuchar por el puerto del sock descontado (listener)
-	listener.Listen(listenerPort);
+
+	MyNetwork::Status status = listener.Listen(listenerPort);
+	if (status != MyNetwork::Status::DONE) {
+		std::cout << "No se ha podido escuchar por el puerto\n";
+	}
+
 	//añado listener al selector
 	selector.Add(&listener);
 	hasToListen = true;
@@ -671,14 +714,14 @@ bool AcknowledgeCreate(InputMemoryStream* ims)
 	Player newPlayer;
 	newPlayer.ID = 1;
 	game.players.push_back(newPlayer);
-
+	game.localId = 1;
 	return true;
 
 }
 
 void CheckCommand() {
 	auto future_line = std::async(std::launch::async, GetLineFromCin);
-	while (!end) {
+	while (!endChatThread) {
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 		if (future_line.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
 			std::cout << "getLine" << std::endl;
@@ -687,17 +730,33 @@ void CheckCommand() {
 			std::string message = line;
 			if (line.length() > 0) {
 
+				if (endChatThread) return;
+
+				OutputMemoryStream oms;
+				oms.Write(CHAT);
+				oms.WriteString(message);
+
+				//GESTION LOCAL DEL READY
+				if (message == "ready") {
+					for (size_t i = 0; i < game.players.size(); i++)
+					{
+						if (game.localId == game.players[i].ID) {
+							game.players[i].isReady = true;
+						}
+					}
+					oms.Write(game.localId);
+				}
+
 				std::cout << "Clientes: " << socksToClients.size() << std::endl;
 				for (int i = 0; i < socksToClients.size(); i++)
 				{
 					std::cout << "HIS PORT: " << socksToClients[i]->GetRemotePort() << std::endl;
 					std::cout << "MY PORT: " << socksToClients[i]->GetLocalPort() << std::endl;
+					MyNetwork::Status status = socksToClients[i]->Send(&oms);
+					if (status != MyNetwork::Status::DONE) {
+						std::cout << "No se ha podido enviar el mensaje al cliente " << i << std::endl;
 
-					OutputMemoryStream oms;
-					oms.Write(CHAT);
-					oms.WriteString(message);
-
-					socksToClients[i]->Send(&oms);
+					}
 				}
 			}
 		}
@@ -712,3 +771,285 @@ std::string GetLineFromCin() {
 	std::cout << "getlinecin" << std::endl;
 	return line;
 }
+
+void Shuffle() {
+
+	std::vector<Card> deck = std::vector<Card>();
+	//organos
+	for (int i = 0; i < 21; i++) {
+		if (i >= 0 && i < 5) {
+			Card newCard = Card{ Type::ORGANO, Color::ROJO };
+			deck.push_back(newCard);
+		}
+		else if (i >= 5 && i < 10) {
+			Card newCard = Card{ Type::ORGANO, Color::VERDE };
+			deck.push_back(newCard);
+		}
+		else if (i >= 10 && i < 15) {
+			Card newCard = Card{ Type::ORGANO, Color::AZUL };
+			deck.push_back(newCard);
+		}
+		else if (i >= 15 && i < 20) {
+			Card newCard = Card{ Type::ORGANO, Color::AMARILLO };
+			deck.push_back(newCard);
+		}
+		else {
+			Card newCard = Card{ Type::ORGANO, Color::COMODIN };
+			deck.push_back(newCard);
+		}
+	}
+
+	//VIRUS
+	for (int i = 0; i < 17; i++) {
+		if (i >= 0 && i < 4) {
+			Card newCard = Card{ Type::VIRUS, Color::ROJO };
+			deck.push_back(newCard);
+		}
+		else if (i >= 4 && i < 8) {
+			Card newCard = Card{ Type::VIRUS, Color::VERDE };
+			deck.push_back(newCard);
+		}
+		else if (i >= 8 && i < 12) {
+			Card newCard = Card{ Type::VIRUS, Color::AZUL };
+			deck.push_back(newCard);
+		}
+		else if (i >= 12 && i < 16) {
+			Card newCard = Card{ Type::VIRUS, Color::AMARILLO };
+			deck.push_back(newCard);
+		}
+		else {
+			Card newCard = Card{ Type::VIRUS, Color::COMODIN };
+			deck.push_back(newCard);
+		}
+	}
+	//MEDICINAS
+	for (int i = 0; i < 20; i++) {
+		if (i >= 0 && i < 4) {
+			Card newCard = Card{ Type::VIRUS, Color::ROJO };
+			deck.push_back(newCard);
+		}
+		else if (i >= 4 && i < 8) {
+			Card newCard = Card{ Type::VIRUS, Color::VERDE };
+			deck.push_back(newCard);
+		}
+		else if (i >= 8 && i < 12) {
+			Card newCard = Card{ Type::VIRUS, Color::AZUL };
+			deck.push_back(newCard);
+		}
+		else if (i >= 12 && i < 16) {
+			Card newCard = Card{ Type::VIRUS, Color::AMARILLO };
+			deck.push_back(newCard);
+		}
+		else {
+			Card newCard = Card{ Type::VIRUS, Color::COMODIN };
+			deck.push_back(newCard);
+		}
+	}
+	srand(game.seed);
+
+
+	for (int i = 0; i < deck.size(); i++) {
+		int random = rand() % deck.size();
+		std::swap(deck[i], deck[random]);
+	}
+
+	//game.deck = std::move(deck);
+	game.deck = deck;
+
+	/*for (int i = 0; i < 12; i++) {
+		switch (game.deck[i].type)
+		{
+		case ORGANO:
+			std::cout << "ORGANO" << std::endl;
+			break;
+		case VIRUS:
+			std::cout << "VIRUS" << std::endl;
+			break;
+		case MEDICINA:
+			std::cout << "MEDICINA" << std::endl;
+			break;
+		case TRATAMIENTO:
+			std::cout << "TRATAMIENTO" << std::endl;
+			break;
+		default:
+			break;
+		}
+
+		switch (game.deck[i].color)
+		{
+		case ROJO:
+			std::cout << "ROJO" << std::endl;
+			break;
+		case AZUL:
+			std::cout << "AZUL" << std::endl;
+			break;
+		case VERDE:
+			std::cout << "VERDE" << std::endl;
+			break;
+		case AMARILLO:
+			std::cout << "AMARILLO" << std::endl;
+			break;
+		case COMODIN:
+			std::cout << "COMODIN" << std::endl;
+			break;
+		default:
+			break;
+		}
+
+	}*/
+}
+
+void Deal() {
+
+	int dealToPlayerNum = 0;
+	int dealedCards = 0;
+	for (int i = 0; i < game.currentPlayers; i++)
+	{
+		while (dealedCards < 3)
+		{
+			game.players[dealToPlayerNum].hand.push_back(game.deck[0]);
+			game.deck.erase(game.deck.begin());
+			dealedCards++;
+		}
+		dealToPlayerNum++;
+		dealedCards = 0;
+	}
+
+	SetInitialTurn();
+}
+
+void SetInitialTurn() {
+	int organsCount = 0;
+	int maxOrgansCounted = -1;
+	for (size_t i = 0; i < game.players.size(); i++)
+	{
+		for (size_t j = 0; j < game.players[i].hand.size(); j++)
+		{
+			if (game.players[i].hand[j].type == Type::ORGANO) {
+				organsCount++;
+			}
+		}
+		if (organsCount > maxOrgansCounted) {
+			currentTurnNumber = game.players[i].ID;
+		}
+	}
+
+	std::cout << "EMPIEZA EL JUGADOR " << currentTurnNumber << std::endl;
+}
+
+void GameManager()
+{
+	std::cout << "EMPIEZA EL JUEGO\n";
+
+	bool allPlayersReady = false;
+
+	//ESPERAMOS A QUE TODOS MANDEN READY
+	while (!allPlayersReady) {
+		int playersReadyCount = 0;
+		for (size_t i = 0; i < game.players.size(); i++)
+		{
+			if (game.players[i].isReady)
+				playersReadyCount++;
+		}
+		if (game.maxPlayers == playersReadyCount) {
+
+			allPlayersReady = true;
+			break;
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+		ConsoleClear();
+		for (size_t i = 0; i < game.players.size(); i++)
+		{
+			std::cout << "Player " << game.players[i].ID << " isReady: " << (int)game.players[i].isReady << std::endl;
+		}
+	}
+
+	endChatThread = true;
+
+
+	int command;
+
+	//LOGICA DE JUEGO
+	while (!end) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+		ConsoleClear();
+
+		if (game.localId != currentTurnNumber) {
+			std::cout << "NO Es tu turno\n";
+		}
+
+		for (size_t i = 0; i < game.players.size(); i++)
+		{
+			std::cout << "MESA DEL JUGADOR " << game.players[i].ID << std::endl;
+			for (size_t j = 0; j < game.players[i].table.size(); i++)
+			{
+				std::cout << "Carta " << j << " " << CardToString(game.players[i].table[j]);
+			}
+		}
+
+		if (game.localId == currentTurnNumber) {
+			for (size_t i = 0; i < game.players.size(); i++)
+			{
+				if (game.players[i].ID == currentTurnNumber)
+				{
+					for (size_t j = 0; j < game.players[i].hand.size(); j++)
+					{
+						std::cout << "Carta " << j << " " << CardToString(game.players[i].hand[j]) << std::endl;
+					}
+				}
+				std::cout << "Elige accion "<< std::endl;
+				std::cout << "1 - Jugar Carta "<< std::endl;
+				std::cout << "2 - Descartar carta "<< std::endl;
+				std::cin >> command;
+			}
+		}
+	}
+}
+
+std::string CardToString(Card card) {
+
+	std::string strCard;
+
+	switch (card.type)
+	{
+	case ORGANO:
+		strCard += "ORGANO ";
+		break;
+	case VIRUS:
+		strCard += "VIRUS ";
+		break;
+	case MEDICINA:
+		strCard += "MEDICINA ";
+		break;
+	case TRATAMIENTO:
+		strCard += "TRATAMIENTO ";
+		break;
+	default:
+		break;
+	}
+
+	switch (card.color)
+	{
+	case VERDE:
+		strCard += "VERDE";
+		break;
+	case ROJO:
+		strCard += "ROJO";
+		break;
+	case AZUL:
+		strCard += "AZUL";
+		break;
+	case AMARILLO:
+		strCard += "AMARILLO";
+		break;
+	case COMODIN:
+		strCard += "COMODIN";
+		break;
+	default:
+		break;
+	}
+
+	return strCard;
+}
+
