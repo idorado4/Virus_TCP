@@ -89,6 +89,7 @@ std::vector<MyNetwork::Socket*> socksToClients;
 Game game;
 
 bool end;
+bool endGame;
 bool hasToListen;
 bool endChatThread;
 
@@ -98,6 +99,7 @@ std::mutex mtxGame;
 
 int main() {
 	end = false;
+	endGame = false;
 	currentTurnNumber = 0;
 	std::cout << "Conectando al servidor" << std::endl;
 
@@ -448,13 +450,18 @@ void ManageConnectedClients()
 					char buffer[1000];
 					size_t br = 0;
 					status = connection->Receive(&ims, buffer, 1000, br);
+					//DESCONEXION
 					if (status != MyNetwork::Status::DONE) {
+
 						selector.Remove(connection);
 						socksToClients.erase(socksToClients.begin() + i);
 						connection->Disconnect();
 						delete connection;
 						std::cout << "Elimino el socket (cliente) que se ha desconectado\n";
 						i--;
+						game.currentPlayers--;
+
+						
 						continue;
 					}
 					std::cout << "Paquete recibido" << std::endl;
@@ -485,7 +492,7 @@ void ManageConnectedClients()
 
 						int idPlayerReceived;
 						ims->Read(&idPlayerReceived);
-						
+
 						int playerIndex;
 						mtxGame.lock();
 						for (size_t j = 0; j < game.players.size(); j++)
@@ -1035,7 +1042,7 @@ void GameLogic()
 
 
 	//LOGICA DE JUEGO
-	while (!end) 
+	while (!endGame)
 	{
 		std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 		ConsoleClear();
@@ -1053,13 +1060,27 @@ void GameLogic()
 		}
 		std::cout << std::endl;
 		std::cout << std::endl;
-		
+
 
 		if (game.localId != currentTurnNumber) {
 			NotYourTurn();
 		}
 		else {
 			YourTurn();
+		}
+
+		//Si solo queda uno ha ganado
+		if (game.currentPlayers == 1) {
+			endGame = true;
+			std::cout << std::endl;
+			std::cout << std::endl;
+			std::cout << std::endl;
+			std::cout << "-------------VICTORIA, FELICIDADES CARMEN!!-------------\n";
+			std::cout << std::endl;
+			std::cout << std::endl;
+			std::cout << std::endl;
+			
+
 		}
 
 	}
@@ -1193,7 +1214,12 @@ void YourTurn()
 			//Hago conocer a todos los jugadores que esta es mi jugada
 			for (size_t i = 0; i < socksToClients.size(); i++)
 			{
-				socksToClients[i]->Send(&oms);
+
+				MyNetwork::Status status = socksToClients[i]->Send(&oms);
+				if (status != MyNetwork::Status::DONE) {
+					std::cout << "No se envió el paquete para buscar sala\n";
+				}
+
 			}
 
 			break;
@@ -1220,7 +1246,11 @@ void YourTurn()
 		oms.WriteString(chatMessage);
 		for (size_t i = 0; i < socksToClients.size(); i++)
 		{
-			socksToClients[i]->Send(&oms);
+			MyNetwork::Status status = socksToClients[i]->Send(&oms);
+			if (status != MyNetwork::Status::DONE) {
+				std::cout << "No se envió el paquete para buscar sala\n";
+			}
+
 		}
 	}
 
